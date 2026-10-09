@@ -48,33 +48,36 @@ document.addEventListener('DOMContentLoaded', function () {
      replies with {"paid": true|false}. The site never touches the
      secret key itself.                                          */
   const payCard = $('[data-pay-card]');
-  const pkBox = $('[data-paystack-test]');
   const PK = C.paystackPublicKey;
   const cardReady = !!(PK && /^pk_(test|live)_/.test(PK));
   const cardMsg = (text) => {
     const m = $('[data-card-msg]');
+    if (!m) return;
     m.textContent = text || '';
     m.className = 'pay-msg' + (text ? ' on err' : '');
   };
 
   if (!cardReady) {
-    payCard.remove();
+    if (payCard) payCard.remove();
     const box = $('[data-gateway]');
     if (!PK) {
-      box.hidden = false;
-      $('[data-gateway-note]').textContent =
-        'No Paystack public key set, so card payment is hidden. Put pk_test_... in ' +
+      if (box) box.hidden = false;
+      const note = $('[data-gateway-note]');
+      if (note) note.textContent =
+        'No Paystack public key set, so card payment is hidden. Put pk_... in ' +
         'paystackPublicKey in assets/js/catalog.js. Bank transfer and cash on delivery work now.';
-      $('[data-gateway-url]').textContent = 'assets/js/catalog.js  ->  paystackPublicKey';
-    } else {
+      const url = $('[data-gateway-url]');
+      if (url) url.textContent = 'assets/js/catalog.js  ->  paystackPublicKey';
+    } else if (box) {
       box.remove();
     }
-  } else if (window.PaystackPop) {
-    $('[data-card-note]').textContent =
-      'Opens a secure Paystack popup where you enter your card details.';
-  } else {
-    $('[data-card-note]').textContent =
-      'Paystack is still loading. If it does not load, check your internet connection.';
+  }
+
+  const cardNote = $('[data-card-note]');
+  if (cardReady && cardNote) {
+    cardNote.textContent = window.PaystackPop
+      ? 'Opens a secure Paystack popup where you enter your card details.'
+      : 'Paystack is still loading. If it does not load, check your internet connection.';
   }
 
   function paint() {
@@ -103,13 +106,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const mode = (document.querySelector('input[name=pay]:checked') || {}).value
       || (cardReady ? 'card' : 'transfer');
     const needRef = mode === 'transfer';
-    $('[data-for=pop]').style.display = needRef ? '' : 'none';
-    $('[data-pop-req]').style.display = needRef ? '' : 'none';
-    pkBox.hidden = !cardReady || mode !== 'card';
+    const popBox = $('[data-for=pop]');
+    if (popBox) popBox.style.display = needRef ? '' : 'none';
+    const popReq = $('[data-pop-req]');
+    if (popReq) popReq.style.display = needRef ? '' : 'none';
     return mode;
   }
   $$('input[name=pay]').forEach((r) => r.addEventListener('change', payMode));
-  if (cardReady) document.querySelector('[data-card-radio]').checked = true;
+  const cardRadio = document.querySelector('[data-card-radio]');
+  if (cardReady && cardRadio) cardRadio.checked = true;
   payMode();
 
   /* ---------- prefill from the last order ---------- */
