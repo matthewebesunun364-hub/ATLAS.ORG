@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#0b0b0c">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230b0b0c'/%3E%3Cpath d='M32 10l7 6v34l-7 6-7-6V16z' fill='%23e3c173'/%3E%3Cpath d='M18 24l6 5v27l-6 5-6-5V29z' fill='%23c9a55c'/%3E%3Cpath d='M46 21l6 5v30l-6 5-6-5V26z' fill='%23d9b06a'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/css/site.css?v=3">
+<link rel="stylesheet" href="assets/css/site.css?v=9">
 </head>
 <body data-page="checkout">
 
@@ -20,40 +20,13 @@
     <div class="sec-h"><h1>Checkout</h1></div>
 
     <div class="steps">
-      <b>1. Delivery address</b> <span>&rsaquo;</span> <span>2. Payment</span> <span>&rsaquo;</span> <span>3. Confirm</span>
+      <b>1. Your details</b> <span>&rsaquo;</span> <span>2. Delivery</span> <span>&rsaquo;</span> <span>3. Receipt</span>
     </div>
 
     <form class="cart-page" id="checkoutForm" novalidate>
       <div>
-        <!-- ADDRESS -->
         <div class="form-box">
-          <h3>1. Delivery address in Akure</h3>
-          <div class="frow">
-            <div class="field" data-for="area">
-              <label for="area">Area in Akure <span class="req">*</span></label>
-              <select id="area" name="area" data-areas></select>
-              <p class="msg">Choose the area we are delivering to</p>
-            </div>
-            <div class="field" data-for="city">
-              <label for="city">Town / area <span class="req">*</span></label>
-              <input id="city" name="city" value="Akure" placeholder="e.g. Alagbaka">
-              <p class="msg">Enter your area in Akure</p>
-            </div>
-          </div>
-          <div class="field" data-for="address">
-            <label for="address">Street address <span class="req">*</span></label>
-            <input id="address" name="address" autocomplete="street-address" placeholder="House number, street, landmark">
-            <p class="msg">We need an address our rider in Akure can find</p>
-          </div>
-          <div class="field" data-for="landmark">
-            <label for="landmark">Nearest landmark (optional)</label>
-            <input id="landmark" name="landmark" placeholder="Opposite the market, beside the church...">
-          </div>
-        </div>
-
-        <!-- CONTACT -->
-        <div class="form-box">
-          <h3>2. Your details</h3>
+          <h3>Your details</h3>
           <div class="frow">
             <div class="field" data-for="name">
               <label for="name">Full name <span class="req">*</span></label>
@@ -69,36 +42,68 @@
           <div class="field" data-for="email">
             <label for="email">Email address <span class="req">*</span></label>
             <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com">
-            <p class="msg">We send your receipt and order updates here</p>
-          </div>
-          <div class="field" data-for="when">
-            <label for="when">When do you need it?</label>
-            <select id="when" name="when">
-              <option>As soon as possible today</option>
-              <option>Tomorrow</option>
-              <option>This weekend</option>
-              <option>I'll call to arrange</option>
-            </select>
+            <p class="msg">We send your receipt here</p>
           </div>
         </div>
 
-        <!-- PAYMENT -->
         <div class="form-box">
-          <h3>3. Payment method</h3>
+          <h3>Delivery in Akure</h3>
+          <div class="frow">
+            <div class="field" data-for="area">
+              <label for="area">Area in Akure <span class="req">*</span></label>
+              <select id="area" name="area" data-areas></select>
+              <p class="msg">Choose the area we are delivering to</p>
+            </div>
+            <div class="field" data-for="city">
+              <label for="city">Town / area <span class="req">*</span></label>
+              <input id="city" name="city" placeholder="e.g. Alagbaka">
+              <p class="msg">Enter your area in Akure</p>
+            </div>
+          </div>
+          <div class="field" data-for="address">
+            <label for="address">Street address <span class="req">*</span></label>
+            <input id="address" name="address" autocomplete="street-address" placeholder="House number, street, landmark">
+            <p class="msg">We need an address our rider in Akure can find</p>
+          </div>
+          <div class="frow">
+            <div class="field" data-for="landmark">
+              <label for="landmark">Nearest landmark (optional)</label>
+              <input id="landmark" name="landmark" placeholder="Opposite the market, beside the church...">
+            </div>
+            <div class="field" data-for="when">
+              <label for="when">When do you need it?</label>
+              <select id="when" name="when">
+                <option>As soon as possible today</option>
+                <option>Tomorrow</option>
+                <option>This weekend</option>
+                <option>I'll call to arrange</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-box">
+          <h3>How you want to pay</h3>
 
           <label class="pay" data-pay-card>
             <input type="radio" name="pay" value="card" data-card-radio>
             <span>
-              <b>Pay online with card</b>
-              <small>Secure payment page. You will be taken to our payment provider to complete the payment.</small>
+              <b>Pay with card</b>
+              <small data-card-note>Card payment, processed securely by Paystack.</small>
             </span>
           </label>
+
+          <div class="paystack-test" data-paystack-test hidden>
+            <span class="mono">Paystack test mode</span>
+            <span>No real money. Test card <b>4084084084084081</b>, any expiry, any CVC, any email.</span>
+          </div>
+          <p class="pay-msg" data-card-msg role="alert"></p>
 
           <label class="pay">
             <input type="radio" name="pay" value="transfer">
             <span>
               <b>Bank transfer</b>
-              <small>Transfer to our account, then send us the reference. Best for large orders.</small>
+              <small>We email you the account details and reference. Fastest for large orders.</small>
             </span>
           </label>
           <div class="bankcard" data-bankcard>
@@ -127,15 +132,9 @@
             <label for="note">Order notes (optional)</label>
             <textarea id="note" name="note" placeholder="Allergies, no fish, call before arriving, cooking for a party..."></textarea>
           </div>
-
-          <p style="font-size:.76rem;color:var(--muted)">
-            By placing this order you agree that we may call you on the number above to confirm the order and
-            the delivery time inside Akure.
-          </p>
         </div>
       </div>
 
-      <!-- SUMMARY -->
       <aside>
         <div class="panel-box summary">
           <div class="hd">Your order <span data-count>0</span> items</div>
@@ -143,20 +142,26 @@
           <div class="row"><span>Subtotal</span><span data-sub>&#8358;0</span></div>
           <div class="row"><span>Delivery in Akure</span><span data-fee>&#8358;0</span></div>
           <div class="row"><span>Discount</span><span data-disc>&#8358;0</span></div>
-          <div class="row tot"><span>Total to pay</span><span data-tot>&#8358;0</span></div>
+          <div class="row tot"><span>Total</span><span data-tot>&#8358;0</span></div>
           <div class="foot">
-            <button class="btn btn-o btn-block btn-lg" type="submit">Place order</button>
-            <p class="mono" style="margin-top:.7rem;text-align:center">Delivered by our own rider in Akure</p>
+            <button class="btn btn-o btn-block btn-lg" type="submit" data-place>Place order</button>
+            <p class="mono" style="margin-top:.6rem;text-align:center">Receipt shown instantly, payment confirmed by us</p>
+            <p class="msg" data-order-msg role="status"></p>
           </div>
         </div>
 
-        <div class="panel-box" style="margin-top:1rem">
-          <div class="hd">Ordering more than 20 cartons?</div>
+        <div class="panel-box" style="margin-top:1rem" data-gateway hidden>
+          <div class="hd">Card payments</div>
           <div style="padding:1rem">
-            <p style="font-size:.8rem;color:var(--muted)">
-              Ask for a wholesale price in Akure before you pay. One basket, one rate, one delivery.
-            </p>
-            <a class="btn btn-y btn-block btn-sm" style="margin-top:.8rem" href="wholesale.html#quote">Request a quote</a>
+            <p style="font-size:.8rem;color:var(--muted)" data-gateway-note></p>
+            <code style="display:block;margin-top:.6rem;font-family:var(--mono);font-size:.7rem;color:var(--accent-soft);word-break:break-all" data-gateway-url></code>
+          </div>
+        </div>
+        <div class="panel-box" style="margin-top:1rem">
+          <div class="hd">Prefer to talk?</div>
+          <div style="padding:1rem">
+            <p style="font-size:.8rem;color:var(--muted)">Call or WhatsApp us and we will take the order with you.</p>
+            <a class="btn btn-y btn-block btn-sm" style="margin-top:.8rem" data-wa href="#">WhatsApp 08060157605</a>
           </div>
         </div>
       </aside>
@@ -164,12 +169,22 @@
   </div>
 </main>
 
-<div id="confirmation" hidden></div>
+<!-- receipt shown after the order is placed -->
+<div class="wrap" id="receiptHost" hidden></div>
+
+<!-- past receipts on this device -->
+<section class="sec" id="pastReceipts" hidden>
+  <div class="wrap">
+    <div class="sec-h"><h2>Your past orders</h2></div>
+    <div class="rcpt-list" data-rlist></div>
+  </div>
+</section>
 
 <div id="site-footer"></div>
 
-<script src="assets/js/catalog.js?v=3"></script>
-<script src="assets/js/store.js?v=3"></script>
-<script src="assets/js/checkout.js?v=3"></script>
+<script src="assets/js/catalog.js?v=9"></script>
+<script src="assets/js/store.js?v=9"></script>
+<script src="assets/js/checkout.js?v=9"></script>
+<script src="https://js.paystack.co/v1/inline.js"></script>
 </body>
 </html>

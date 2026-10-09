@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Replace https://ayoolaenterprise.pages.dev with your real domain.
-  Category URLs come from assets/js/catalog.js - keep them in step.
--->
+<!-- Replace https://ayoolaenterprise.pages.dev with your real domain after hosting. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://ayoolaenterprise.pages.dev/</loc><priority>1.0</priority><changefreq>daily</changefreq></url>
-  <url><loc>https://ayoolaenterprise.pages.dev/category.html</loc><priority>0.9</priority><changefreq>daily</changefreq></url>
-  <url><loc>https://ayoolaenterprise.pages.dev/wholesale.html</loc><priority>0.7</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://ayoolaenterprise.pages.dev/</loc><priority>1.0</priority><changefreq>weekly</changefreq></url>
+  <url><loc>https://ayoolaenterprise.pages.dev/wholesale.html</loc><priority>0.8</priority><changefreq>monthly</changefreq></url>
+  <url><loc>https://ayoolaenterprise.pages.dev/category.html</loc><priority>0.9</priority><changefreq>weekly</changefreq></url>
   <url><loc>https://ayoolaenterprise.pages.dev/category.html?cat=foodstuffs</loc><priority>0.8</priority></url>
   <url><loc>https://ayoolaenterprise.pages.dev/category.html?cat=frozen</loc><priority>0.8</priority></url>
   <url><loc>https://ayoolaenterprise.pages.dev/category.html?cat=poultry</loc><priority>0.8</priority></url>
@@ -15,4 +12,10 @@
   <url><loc>https://ayoolaenterprise.pages.dev/category.html?cat=noodles</loc><priority>0.6</priority></url>
   <url><loc>https://ayoolaenterprise.pages.dev/category.html?cat=snacks</loc><priority>0.7</priority></url>
   <url><loc>https://ayoolaenterprise.pages.dev/category.html?cat=bundles</loc><priority>0.7</priority></url>
+  <url><loc>https://ayoolaenterprise.pages.dev/product.html?id=rice50</loc><priority>0.7</priority></url>
+  <url><loc>https://ayoolaenterprise.pages.dev/product.html?id=ftilapia</loc><priority>0.7</priority></url>
+  <url><loc>https://ayoolaenterprise.pages.dev/product.html?id=fchicken</loc><priority>0.7</priority></url>
+  <url><loc>https://ayoolaenterprise.pages.dev/product.html?id=coke2l</loc><priority>0.6</priority></url>
+  <url><loc>https://ayoolaenterprise.pages.dev/product.html?id=malt</loc><priority>0.6</priority></url>
+  <url><loc>https://ayoolaenterprise.pages.dev/product.html?id=bundle-shop</loc><priority>0.7</priority></url>
 </urlset>

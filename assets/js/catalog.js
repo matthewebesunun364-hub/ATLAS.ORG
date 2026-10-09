@@ -45,21 +45,28 @@ window.AYOOLA = (function () {
     deliveryFee: 2500,
     freeDeliveryOver: 30000,               // free inside Akure above this
     sameDayCutoff: '2pm',
-    openHours: ['Mo-Sa 08:00-19:00'],
 
-    /* ---------- PAYMENT ----------
-       Leave payLink blank to use bank transfer + pay on delivery.
-       If you paste a hosted payment page (Paystack, Flutterwave,
-       Monnify, Stripe Payment Link, Razorpay...) the customer is
-       sent there to pay, and the link can carry your public key
-       (pk_... / flw_pub_...) which is safe to expose.
+    /* ---------- PAYMENT (Paystack) ----------
+       Card payments run through Paystack. In TEST MODE nothing is
+       charged, but the transaction shows up in your Paystack
+       dashboard under Transactions.
 
-       !! NEVER put a SECRET key (sk_..., secret key, API secret)
-          in this file or anywhere in this folder. Anything here is
-          visible to every visitor. Secret keys belong in a server,
-          a Cloudflare Worker or a Google Apps Script.              */
-    payLink: '',
-    publicKey: '',
+         paystackPublicKey  pk_test_...   SAFE to keep in this file.
+                            It is a public key; it only opens the
+                            payment popup and cannot move money.
+         paystackEndpoint   Optional. URL of the Cloudflare Worker in
+                            paystack-worker.js, used to VERIFY the
+                            payment server-side and to receive
+                            webhooks. Test payments work without it.
+
+       !! The SECRET key (sk_test_... / sk_live_...) must NOT appear
+          anywhere in this folder. It belongs in the Worker:
+              npx wrangler secret put PAYSTACK_SECRET_KEY
+          Everything here is readable by every visitor.            */
+    paystackPublicKey: 'pk_test_ce6f0a13daed65eaf34d39fdd3a2ba9e53db8e3d',
+    paystackEndpoint: '',         // <- paste your Worker URL here
+    currency: 'NGN',
+
     bank: {
       bank: 'Bank Name',                    // TODO
       accountName: 'Ayoola Enterprises',

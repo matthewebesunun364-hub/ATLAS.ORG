@@ -17,12 +17,14 @@ const WA = 'https://wa.me/' + C.whatsapp;
    LOGO
    ------------------------------------------------------------
    Gold towers on navy, matching the Ayoola Enterprises logo.
-   Swap in the exact artwork at any time: drop your file in
-   assets/img/logo.png and it replaces the mark automatically
-   (see logoHTML below - no code change needed).
-   =========================================================== */
-const LOGO_FALLBACK = 'assets/img/logo.png';
+   Swap in the exact artwork any time: save your file as
+   assets/img/logo.png, then replace the body of logoMark()
+   below with:
 
+     return '<img src="assets/img/logo.png" alt="" width="40" height="36">';
+
+   Nothing else needs to change.
+   =========================================================== */
 const LOGO_MARK =
   '<svg class="logo-mark" viewBox="0 0 120 108" width="40" height="36" aria-hidden="true" focusable="false">' +
     '<defs>' +
@@ -56,12 +58,7 @@ const LOGO_MARK =
   '</svg>';
 
 function logoMark() {
-  /* if the owner drops in assets/img/logo.png, use it verbatim */
-  return '<span class="logo-img-wrap" data-logo-img>' +
-    '<img src="' + LOGO_FALLBACK + '" alt="" width="40" height="36" ' +
-    'onerror="this.parentNode.removeAttribute(\'data-has-img\');this.remove()">' +
-    LOGO_MARK +
-  '</span>';
+  return '<span class="logo-mark-wrap">' + LOGO_MARK + '</span>';
 }
 
 function logoWord(small) {

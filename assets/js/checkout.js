@@ -1,15 +1,20 @@
 /* ===========================================================
    AYOOLA ENTERPRISES - checkout page (Akure delivery)
    ------------------------------------------------------------
-   Payment options:
-     card     -> send the customer to your hosted payment page
-                 (CONFIG.payLink). Only the PUBLIC key goes here.
-     transfer -> bank transfer + reference
-     delivery -> cash on delivery in Akure
+   How it works, exactly like the first Ayoola Enterprise site:
 
-   The secret key (sk_... / secret key / API secret) is NEVER
-   used in this file. It belongs on a server (Cloudflare Worker,
-   Google Apps Script or your provider's server-side SDK).
+     1. Customer fills in details and presses "Place order".
+     2. The order is recorded on the device and the receipt appears.
+     3. A pre-written email draft opens in their mail app, plus a
+        WhatsApp button - so the order reaches us with no gateway.
+     4. If you set orderEndpoint, the order is ALSO POSTed there.
+
+   If you set payLink, a "Pay online with card" option appears and
+   card orders jump to that hosted page after the receipt is saved.
+
+   No secret key is used anywhere in this file. A secret key belongs
+   on a server (Cloudflare Worker, Apps Script, or your provider's
+   server-side SDK) - never in files a browser can read.
    =========================================================== */
 document.addEventListener('DOMContentLoaded', function () {
   const S = window.SHOP, A = S.A, C = S.C, $ = S.$, $$ = S.$$;
@@ -30,22 +35,51 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
-  /* ---------- Akure delivery areas ---------- */
+  /* ---------- Akure areas ---------- */
   $('[data-areas]').innerHTML = '<option value="">Select your area</option>' +
     (C.areas || []).map((a) => '<option>' + a + '</option>').join('');
   $('#city').value = C.city;
 
-  $('[data-bank]').textContent = C.bank.bank;
-  $('[data-acctname]').textContent = C.bank.accountName;
-  $('[data-acctno]').textContent = C.bank.accountNumber;
+  $$('[data-wa]').forEach((el) => { el.href = S.WA; el.target = '_blank'; el.rel = 'noopener'; });
 
-  /* ---------- card option only when a pay link is configured ---------- */
-  if (!C.payLink) $('[data-pay-card]').remove();
-  else document.querySelector('[data-pay-card] small').textContent =
-    'Secure payment page. You will be taken to ' + new URL(C.payLink, location.href).hostname + ' to pay.';
+  /* ---------- Paystack ----------
+     The public key is all the browser needs: Paystack's Inline JS
+     opens its own secure popup and handles the card. That is enough
+     to take a payment in test mode.
 
-  const WA = 'https://wa.me/' + C.whatsapp + '?text=' +
-    encodeURIComponent('Hello Ayoola Enterprises, I have just placed order ');
+     paystackEndpoint (optional) is used after the popup closes, to
+     VERIFY the payment server-side. Without it the order is trusted
+     on the customer's word, which is fine while testing.        */
+  const payCard = $('[data-pay-card]');
+  const pkBox = $('[data-paystack-test]');
+  const PK = C.paystackPublicKey;
+  const cardReady = !!(PK && /^pk_(test|live)_/.test(PK));
+  const cardMsg = (text) => {
+    const m = $('[data-card-msg]');
+    m.textContent = text || '';
+    m.className = 'pay-msg' + (text ? ' on err' : '');
+  };
+
+  if (!cardReady) {
+    payCard.remove();
+    const box = $('[data-gateway]');
+    if (!PK) {
+      box.hidden = false;
+      $('[data-gateway-note]').textContent =
+        'No Paystack public key set, so card payment is hidden. Put pk_test_... in ' +
+        'paystackPublicKey in assets/js/catalog.js. Bank transfer and cash on delivery work now.';
+      $('[data-gateway-url]').textContent = 'assets/js/catalog.js  ->  paystackPublicKey';
+    } else {
+      box.remove();
+    }
+  } else if (window.PaystackPop) {
+    $('[data-card-note]').textContent = PK.startsWith('pk_test_')
+      ? 'Opens a secure Paystack popup. Test mode is on, no real money.'
+      : 'Opens a secure Paystack popup.';
+  } else {
+    $('[data-card-note]').textContent =
+      'Paystack is still loading. If it does not load, check your internet connection.';
+  }
 
   function paint() {
     const lines = S.cart.lines();
@@ -68,18 +102,21 @@ document.addEventListener('DOMContentLoaded', function () {
     $('[data-tot]').textContent = A.money(sub - disc + fee);
   }
 
-  /* bank card visible only for transfer; transfer reference only for transfer */
+  /* ---------- pay mode ---------- */
   function payMode() {
-    const mode = (document.querySelector('input[name=pay]:checked') || {}).value || 'transfer';
-    $('[data-bankcard]').style.display = mode === 'transfer' ? '' : 'none';
-    $('[data-for=pop]').style.display = mode === 'transfer' ? '' : 'none';
-    $('[data-pop-req]').style.display = mode === 'transfer' ? '' : 'none';
+    const mode = (document.querySelector('input[name=pay]:checked') || {}).value
+      || (cardReady ? 'card' : 'transfer');
+    const needRef = mode === 'transfer';
+    $('[data-for=pop]').style.display = needRef ? '' : 'none';
+    $('[data-pop-req]').style.display = needRef ? '' : 'none';
+    pkBox.hidden = !cardReady || mode !== 'card';
     return mode;
   }
   $$('input[name=pay]').forEach((r) => r.addEventListener('change', payMode));
+  if (cardReady) document.querySelector('[data-card-radio]').checked = true;
   payMode();
 
-  /* prefill from the last order on this device */
+  /* ---------- prefill from the last order ---------- */
   try {
     const saved = JSON.parse(localStorage.getItem('ayoola.customer.v1') || 'null');
     if (saved) {
@@ -96,6 +133,11 @@ document.addEventListener('DOMContentLoaded', function () {
     if (f) f.classList.add('err');
   }
   function clearErr() { $$('.field').forEach((f) => f.classList.remove('err')); }
+  function say(text, cls) {
+    const m = $('[data-order-msg]');
+    m.textContent = text;
+    m.className = 'msg on ' + (cls || '');
+  }
 
   function validate() {
     clearErr();
@@ -103,12 +145,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const mode = payMode();
     let ok = true;
 
-    if (!v('area')) { fail('area'); ok = false; }
-    if (!v('city')) { fail('city'); ok = false; }
-    if (v('address').length < 5) { fail('address'); ok = false; }
     if (!v('name')) { fail('name'); ok = false; }
     if (v('phone').replace(/\D/g, '').length < 10) { fail('phone'); ok = false; }
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v('email'))) { fail('email'); ok = false; }
+    if (!v('area')) { fail('area'); ok = false; }
+    if (!v('city')) { fail('city'); ok = false; }
+    if (v('address').length < 5) { fail('address'); ok = false; }
     if (mode === 'transfer' && !v('pop')) { fail('pop'); ok = false; }
 
     if (!ok) {
@@ -119,162 +161,348 @@ document.addEventListener('DOMContentLoaded', function () {
     return ok;
   }
 
-  /* ---------- place order ---------- */
-  $('#checkoutForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (!validate()) return;
-
-    const g = function (id) { return document.getElementById(id).value.trim(); };
+  /* ---------- build the order ---------- */
+  function buildOrder(d) {
+    const lines = S.cart.lines();
     const sub = S.cart.subtotal();
     const disc = discountFor(sub);
     const fee = S.cart.delivery();
-    const ref = S.orders.ref();
-    const lines = S.cart.lines();
     const pay = payMode();
 
-    const order = {
-      ref: ref,
+    return {
+      ref: S.orders.ref(),
       at: new Date().toISOString(),
       city: C.city, state: C.state,
-      name: g('name'), phone: g('phone'), email: g('email'),
-      area: g('area'), address: g('address'), landmark: g('landmark'), when: g('when'),
-      note: g('note'), pop: pay === 'transfer' ? g('pop') : '',
+      name: d.name, phone: d.phone, email: d.email,
+      area: d.area, address: d.address, landmark: d.landmark, when: d.when, note: d.note,
+      pop: pay === 'transfer' ? d.pop : '',
       pay: pay,
       items: lines.map(function (l) {
         return { id: l.id, item: l.p.name, size: l.s.label, qty: l.qty, price: l.s.price, line: l.line };
       }),
       subtotal: sub, discount: disc, delivery: fee, total: sub - disc + fee,
       status: pay === 'card' ? 'Awaiting online payment'
-            : pay === 'transfer' ? 'Awaiting transfer confirmation'
+            : pay === 'transfer' ? 'Awaiting bank transfer'
             : 'Pay on delivery in Akure',
     };
+  }
 
-    S.orders.save(order);
+  /* ---------- email draft (the fallback that always works) ---------- */
+  function mailDraft(o) {
+    const rows = o.items.map((i) => '  ' + i.qty + ' x ' + i.item + ' (' + i.size + ')  ' + A.money(i.line)).join('\n');
+    const body = [
+      'NEW ORDER from the Ayoola Enterprises website',
+      '',
+      'Reference: ' + o.ref,
+      'Name: ' + o.name,
+      'Phone: ' + o.phone,
+      'Email: ' + o.email,
+      'Delivery address: ' + o.address + ', ' + o.area + ', ' + o.city + ', ' + o.state,
+      o.landmark ? 'Landmark: ' + o.landmark : '',
+      'When: ' + o.when,
+      o.note ? 'Notes: ' + o.note : '',
+      '',
+      'ITEMS',
+      rows,
+      '',
+      'Subtotal: ' + A.money(o.subtotal),
+      o.discount ? 'Discount: -' + A.money(o.discount) : '',
+      'Delivery: ' + (o.delivery ? A.money(o.delivery) : 'Free'),
+      'TOTAL: ' + A.money(o.total),
+      '',
+      'Payment: ' + (o.pay === 'transfer' ? 'Bank transfer, reference ' + o.pop : 'Cash on delivery'),
+    ].filter(Boolean).join('\n');
 
-    /* optional: send the order to your own endpoint (server side) */
-    if (C.orderEndpoint) {
-      try {
-        fetch(C.orderEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(order),
-        }).catch(function () {});
-      } catch (err) {}
-    }
-
-    try {
-      localStorage.setItem('ayoola.customer.v1', JSON.stringify({
-        name: order.name, phone: order.phone, email: order.email,
-        area: order.area, city: order.city, address: order.address, landmark: order.landmark,
-      }));
-    } catch (err) {}
-
-    S.cart.clear();
-
-    /* card orders jump straight to the payment page */
-    if (pay === 'card' && C.payLink) {
-      const sep = C.payLink.indexOf('?') === -1 ? '?' : '&';
-      location.href = C.payLink + sep +
-        'reference=' + encodeURIComponent(ref) +
-        '&amount=' + (sub - disc + fee) * 100 +
-        '&email=' + encodeURIComponent(order.email) +
-        (C.publicKey ? '&public_key=' + encodeURIComponent(C.publicKey) : '');
-      return;
-    }
-
-    showConfirmation(order);
-  });
-
-  /* ---------- confirmation ---------- */
-  function showConfirmation(o) {
-    $('#checkoutMain').hidden = true;
-    const box = $('#confirmation');
-    box.hidden = false;
-
-    const mailBody =
-      'Order reference: ' + o.ref + '\n' +
-      'Date: ' + new Date(o.at).toLocaleString('en-NG') + '\n\n' +
-      'Customer: ' + o.name + '\nPhone: ' + o.phone + '\nEmail: ' + o.email + '\n' +
-      'Deliver to: ' + o.address + ', ' + o.area + ', ' + o.city + ', ' + o.state +
-        (o.landmark ? ' (near ' + o.landmark + ')' : '') + '\n' +
-      'When: ' + o.when + '\n\n' +
-      o.items.map(function (i) { return i.qty + ' x ' + i.item + ' (' + i.size + ') = ' + A.money(i.line); }).join('\n') +
-      '\n\nSubtotal: ' + A.money(o.subtotal) +
-      (o.discount ? '\nDiscount: -' + A.money(o.discount) : '') +
-      '\nDelivery: ' + (o.delivery ? A.money(o.delivery) : 'Free') +
-      '\nTOTAL: ' + A.money(o.total) + '\n\n' +
-      'Payment: ' + (o.pay === 'transfer' ? 'Bank transfer, reference ' + o.pop : 'Cash on delivery') +
-      (o.note ? '\n\nNote: ' + o.note : '');
-    const mailHref = 'mailto:' + C.email +
+    return 'mailto:' + C.email +
       '?subject=' + encodeURIComponent('New order ' + o.ref) +
-      '&body=' + encodeURIComponent(mailBody);
+      '&body=' + encodeURIComponent(body);
+  }
 
+  function waLink(o) {
+    const rows = o.items.map((i) => i.qty + ' x ' + i.item + ' (' + i.size + ') = ' + A.money(i.line)).join('\n');
+    const text = 'NEW ORDER from the Ayoola Enterprises website\n\n' +
+      'Reference: ' + o.ref + '\n' +
+      'Name: ' + o.name + '\nPhone: ' + o.phone + '\n' +
+      'Deliver to: ' + o.address + ', ' + o.area + ', ' + o.city + '\n\n' + rows +
+      '\n\nTOTAL: ' + A.money(o.total) +
+      (o.pay === 'transfer' ? '\nTransfer reference: ' + o.pop : '');
+    return S.WA + '?text=' + encodeURIComponent(text);
+  }
+
+  /* ---------- optional endpoint ---------- */
+  async function postOrder(o) {
+    if (!C.orderEndpoint) return { ok: false, fallback: true };
+    try {
+      const res = await fetch(C.orderEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(o),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return { ok: true };
+    } catch (err) {
+      console.warn('Order endpoint failed, falling back to the email draft.', err);
+      return { ok: false, fallback: true };
+    }
+  }
+
+  /* ---------- RECEIPT (printable, like the first site) ---------- */
+  const RECEIPTS_KEY = 'ayoola.receipts.v2';
+  const receipts = {
+    all() { try { const v = JSON.parse(localStorage.getItem(RECEIPTS_KEY)); return Array.isArray(v) ? v : []; } catch (e) { return []; } },
+    save(r) {
+      const list = this.all();
+      list.unshift(r);
+      try { localStorage.setItem(RECEIPTS_KEY, JSON.stringify(list.slice(0, 20))); } catch (e) {}
+    },
+    find(ref) { return this.all().filter((r) => r.ref === ref)[0] || null; },
+  };
+
+  function receiptHTML(o) {
     const rows = o.items.map(function (i) {
-      return '<tr><td style="padding:.55rem 0;border-bottom:1px solid var(--line)">' + S.esc(i.item) +
-        '<br><span style="color:var(--muted);font-size:.76rem">' + S.esc(i.size) + ' x ' + i.qty + '</span></td>' +
-        '<td style="text-align:right;white-space:nowrap;padding:.55rem 0;border-bottom:1px solid var(--line)">' +
-        A.money(i.line) + '</td></tr>';
+      return '<tr>' +
+        '<td class="name">' + S.esc(i.item) + '<br><span style="color:var(--muted);font-size:.78rem">' +
+          S.esc(i.size) + '</span></td>' +
+        '<td class="num">' + i.qty + '</td>' +
+        '<td class="num">' + A.money(i.price) + '</td>' +
+        '<td class="num">' + A.money(i.line) + '</td>' +
+      '</tr>';
     }).join('');
 
-    box.innerHTML = '<div class="wrap"><div class="sec"><div class="done">' +
-      '<div class="tick">&#10003;</div>' +
-      '<h1>Thank you, ' + S.esc(o.name.split(' ')[0]) + '</h1>' +
-      '<p>Your order is in. We will call you on ' + S.esc(o.phone) +
-        ' to confirm, then our rider brings it to you in ' + S.esc(o.city) + '.</p>' +
-      '<div class="refbox">' + o.ref + '</div>' +
+    return '' +
+    '<div class="rcpt">' +
+      '<div class="rcpt-head">' +
+        '<div class="rcpt-brand">' +
+          '<b>Ayoola Enterprises</b>' +
+          '<p>Food vendor in Akure &middot; foodstuffs, frozen fish, poultry &amp; drinks</p>' +
+        '</div>' +
+        '<div class="rcpt-meta">' +
+          '<b>Order receipt</b>' +
+          'Ref: ' + o.ref + '<br>' +
+          new Date(o.at).toLocaleString('en-NG') + '<br>' +
+          'Status: ' + S.esc(o.status) +
+          (o.payment ? '<br>Payment: ' + S.esc(o.payment.status) +
+            (o.payment.verified ? ' (verified)' : '') + '<br>' +
+            '<span style="font-size:.6rem">' + S.esc(o.payment.id) + '</span>' : '') +
+        '</div>' +
+      '</div>' +
 
-      '<div class="panel-box" style="text-align:left">' +
-        '<div class="hd">' + C.company + ' &mdash; order summary' +
-          '<span>' + S.esc(o.status) + '</span></div>' +
-        '<div style="padding:.4rem 1rem .8rem">' +
-          '<table style="width:100%;border-collapse:collapse;font-size:.82rem">' + rows +
-          '<tr><td style="padding:.45rem 0;border-top:1px solid var(--line)">Subtotal</td>' +
-            '<td style="text-align:right;border-top:1px solid var(--line)">' + A.money(o.subtotal) + '</td></tr>' +
-          (o.discount ? '<tr><td style="padding:.35rem 0">Discount</td>' +
-            '<td style="text-align:right;color:var(--ok)">− ' + A.money(o.discount) + '</td></tr>' : '') +
-          '<tr><td style="padding:.35rem 0">Delivery in Akure</td><td style="text-align:right">' +
+      '<div class="rcpt-parties">' +
+        '<div><h4>Customer</h4><p>' + S.esc(o.name) + '<br>' + S.esc(o.phone) + '<br>' + S.esc(o.email) + '</p></div>' +
+        '<div><h4>Delivery address</h4><p>' + S.esc(o.address) + '<br>' + S.esc(o.area) + ', ' +
+          S.esc(o.city) + ', ' + S.esc(o.state) + (o.landmark ? '<br>Near: ' + S.esc(o.landmark) : '') + '</p></div>' +
+      '</div>' +
+
+      '<table class="rcpt-table">' +
+        '<thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Amount</th></tr></thead>' +
+        '<tbody>' + (rows || '<tr><td class="name" colspan="4">No items on this order.</td></tr>') + '</tbody>' +
+        '<tfoot>' +
+          '<tr><td colspan="3" class="lbl num">Subtotal</td><td class="num">' + A.money(o.subtotal) + '</td></tr>' +
+          (o.discount ? '<tr><td colspan="3" class="lbl num">Discount</td><td class="num">- ' + A.money(o.discount) + '</td></tr>' : '') +
+          '<tr><td colspan="3" class="lbl num">Delivery</td><td class="num">' +
             (o.delivery ? A.money(o.delivery) : 'Free') + '</td></tr>' +
-          '<tr><td style="padding:.7rem 0;border-top:1px solid var(--line);font-weight:600;font-size:1rem">Total</td>' +
-            '<td style="text-align:right;border-top:1px solid var(--line);font-weight:600;font-size:1rem">' +
-            A.money(o.total) + '</td></tr>' +
-        '</table>' +
-        '<p class="mono" style="margin-top:.6rem">' + new Date(o.at).toLocaleString('en-NG') + '</p>' +
-      '</div>' +
-      '<div style="padding:0 1rem 1rem">' +
-        '<p style="font-size:.82rem"><b style="font-weight:500">Deliver to</b><br>' + S.esc(o.address) + ', ' +
-          S.esc(o.area) + ', ' + S.esc(o.city) + ', ' + S.esc(o.state) +
-          (o.landmark ? '<br>Near: ' + S.esc(o.landmark) : '') + '</p>' +
-        (o.note ? '<p style="font-size:.78rem;color:var(--muted);margin-top:.6rem">' +
-          '<b style="color:var(--paper);font-weight:500">Your note:</b> ' + S.esc(o.note) + '</p>' : '') +
-      '</div>' +
-      (o.pay === 'transfer' ?
-        '<div class="bankcard" style="margin:0 1rem 1rem;text-align:left">' +
-          '<b style="font-weight:500">Complete your transfer</b>' +
-          '<dl><dt>Bank</dt><dd>' + S.esc(C.bank.bank) + '</dd>' +
-          '<dt>Account name</dt><dd>' + S.esc(C.bank.accountName) + '</dd>' +
-          '<dt>Account number</dt><dd>' + S.esc(C.bank.accountNumber) + '</dd>' +
-          '<dt>Amount</dt><dd>' + A.money(o.total) + '</dd>' +
-          '<dt>Reference</dt><dd>' + o.ref + '</dd></dl>' +
-          '<p style="margin:.7rem 0 0;color:var(--muted)">Send the transfer alert to ' + C.phone +
-            ' on WhatsApp and we start packing straight away.</p>' +
-        '</div>' : '') +
-      '</div>' +
+          '<tr class="tot"><td colspan="3" class="lbl num">Total</td><td class="num">' + A.money(o.total) + '</td></tr>' +
+        '</tfoot>' +
+      '</table>' +
 
-      '<div style="display:flex;gap:.6rem;justify-content:center;flex-wrap:wrap;margin:1.4rem 0">' +
-        '<a class="btn btn-o btn-lg" target="_blank" rel="noopener" href="' + WA + o.ref + '">' +
-          'Send order on WhatsApp</a>' +
-        '<a class="btn btn-lg" href="' + mailHref + '">Email the order instead</a>' +
-        '<a class="btn btn-lg" href="index.html">Continue shopping</a>' +
+      '<div class="rcpt-foot">' +
+        (o.pay === 'card'
+          ? '<h4>Payment</h4><p>Card payment ' + S.esc(o.payment ? o.payment.status : 'received') +
+            (o.payment && o.payment.live ? '' : ' in test mode - no real money was taken') +
+            '.</p>'
+          : o.pay === 'transfer'
+          ? '<h4>How to pay</h4>' +
+            '<p>Transfer <strong>' + A.money(o.total) + '</strong> to:</p>' +
+            '<p><strong>' + S.esc(C.bank.bank) + '</strong><br>' +
+              'Account name: ' + S.esc(C.bank.accountName) + '<br>' +
+              'Account number: ' + S.esc(C.bank.accountNumber) + '</p>' +
+            '<p>Quote reference <strong>' + o.ref + '</strong>' +
+              (o.pop ? ' and your transfer reference ' + S.esc(o.pop) : '') +
+              '. Send us the alert on WhatsApp ' + C.phone + ' and we start packing.</p>'
+          : o.pay === 'delivery'
+            ? '<h4>How to pay</h4><p>Pay our rider in cash when the food arrives in ' +
+              S.esc(C.city) + '. Keep reference <strong>' + o.ref + '</strong>.</p>'
+            : '<h4>How to pay</h4><p>Complete payment on the payment page. Keep reference <strong>' +
+              o.ref + '</strong>.</p>') +
+        (o.note ? '<h4 style="margin-top:1rem">Your note</h4><p>' + S.esc(o.note) + '</p>' : '') +
+        '<h4 style="margin-top:1rem">Questions</h4>' +
+        '<p>WhatsApp ' + C.phone + ' or email ' + C.email + ' quoting ' + o.ref + '.</p>' +
       '</div>' +
-
-      '<p style="font-size:.78rem;color:var(--muted)">' +
-        'Send us the order on WhatsApp or by email so we can confirm it straight away. ' +
-        'A copy is kept on this device &mdash; keep the reference ' + o.ref + ' for your records.</p>' +
-    '</div></div></div>';
-
-    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    '</div>';
   }
+
+  function showReceipt(ref) {
+    const host = $('#receiptHost');
+    const o = receipts.find(ref) || window.__lastOrder;
+    if (!host || !o) return;
+    host.innerHTML =
+      '<div class="sec">' +
+      '<div class="done"><div class="tick">&#10003;</div>' +
+        '<h1>Order placed, ' + S.esc(o.name.split(' ')[0]) + '</h1>' +
+        '<p>Your receipt is below. Send it to us so we can start packing and confirm the delivery time in Akure.</p>' +
+        '<div class="refbox">' + o.ref + '</div>' +
+      '</div>' +
+      receiptHTML(o) +
+      '<div class="rcpt-acts" style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem">' +
+        '<button class="btn btn-y" type="button" data-print>Print or save as PDF</button>' +
+        '<a class="btn btn-o" href="' + mailDraft(o) + '">Send by email</a>' +
+        '<a class="btn btn-o" target="_blank" rel="noopener" href="' + waLink(o) + '">Send on WhatsApp</a>' +
+        '<a class="btn" href="category.html">Keep shopping</a>' +
+      '</div></div>';
+    host.hidden = false;
+    host.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function paintReceiptList() {
+    const host = $('#pastReceipts');
+    if (!host) return;
+    const list = receipts.all();
+    host.hidden = list.length === 0;
+    if (!list.length) return;
+    $('[data-rlist]').innerHTML = list.map(function (r) {
+      return '<a href="#" data-rref="' + r.ref + '">' +
+        '<span>' + r.ref + '</span>' +
+        '<span>' + new Date(r.at).toLocaleDateString('en-NG') + ' &middot; ' + A.money(r.total) + '</span>' +
+      '</a>';
+    }).join('');
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('[data-print]')) { window.print(); return; }
+    const a = e.target.closest('[data-rref]');
+    if (!a) return;
+    e.preventDefault();
+    showReceipt(a.dataset.rref);
+  });
+
+  /* ---------- Paystack: open the popup, then verify ---------- */
+  function payWithPaystack(order, btn) {
+    return new Promise(function (resolve) {
+      if (!window.PaystackPop) {
+        say('Paystack could not load. Check your internet, or pay by bank transfer.', 'err');
+        btn.disabled = false;
+        return resolve(false);
+      }
+
+      const amount = Math.round(order.total * 100);   /* naira -> kobo */
+
+      const handler = PaystackPop.setup({
+        key: PK,
+        email: order.email,
+        amount: amount,
+        currency: C.currency || 'NGN',
+        ref: order.ref,
+        metadata: {
+          order_ref: order.ref,
+          customer: order.name,
+          phone: order.phone,
+          delivery_area: order.area,
+        },
+        onSuccess: function (trans) {
+          cardMsg('');
+          order.payment = {
+            id: (trans && trans.reference) || order.ref,
+            status: 'success',
+            transaction: (trans && trans.transcription && trans.transcription.reference) || '',
+            amount: amount,
+            live: !PK.startsWith('pk_test_'),
+          };
+          order.status = 'Paid by card' + (order.payment.live ? '' : ' (test mode)');
+          resolve(true);
+        },
+        onCancel: function () {
+          say('Payment cancelled. Your basket is still here if you want to try again.', 'err');
+          btn.disabled = false;
+          resolve(false);
+        },
+      });
+
+      handler.openIframe();
+    });
+  }
+
+  /* optional server-side verification, once the Worker is deployed */
+  async function verifyPaystack(order) {
+    if (!C.paystackEndpoint || !order.payment) return order;
+    try {
+      const res = await fetch(C.paystackEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reference: order.payment.id || order.ref }),
+      });
+      const data = await res.json();
+      if (res.ok && data.paid) {
+        order.payment.verified = true;
+        order.payment.serverAmount = data.amount;
+      } else if (res.ok) {
+        order.payment.verified = false;
+        order.payment.serverStatus = data.status;
+      } else {
+        order.payment.verifyError = data.error;
+      }
+    } catch (e) {
+      order.payment.verifyError = e.message;
+    }
+    return order;
+  }
+
+  /* ---------- PLACE ORDER ---------- */
+  $('#checkoutForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!validate()) return;
+
+    const g = function (id) { return document.getElementById(id).value.trim(); };
+    const order = buildOrder({
+      name: g('name'), phone: g('phone'), email: g('email'),
+      area: g('area'), address: g('address'), landmark: g('landmark'),
+      when: g('when'), note: g('note'), pop: g('pop'),
+    });
+
+    const btn = this.querySelector('[type=submit]');
+    btn.disabled = true;
+    say('Please wait...');
+
+    /* card orders open Paystack first, then fall through to the same receipt flow */
+    const run = order.pay === 'card' && cardReady
+      ? payWithPaystack(order, btn)
+          .then(function (paid) { return paid ? verifyPaystack(order) : null; })
+          .then(function (o) { return o ? postOrder(order).then(function () { return order; }) : null; })
+      : postOrder(order).then(function () { return order; });
+
+    run.then(function (done) {
+      if (!done) return;
+
+      window.__lastOrder = done;
+      receipts.save(done);
+      paintReceiptList();
+
+      try {
+        localStorage.setItem('ayoola.customer.v1', JSON.stringify({
+          name: done.name, phone: done.phone, email: done.email,
+          area: done.area, city: done.city, address: done.address, landmark: done.landmark,
+        }));
+      } catch (err) {}
+
+      S.cart.clear();
+
+      if (done.payment && done.payment.status === 'success') {
+        say('Payment received' + (done.payment.live ? '.' : ' (test mode - no real money).'), 'ok');
+      } else {
+        say('Your order is ready. Send the email we opened, and your receipt is below.', 'ok');
+        setTimeout(function () { window.location.href = mailDraft(done); }, 600);
+      }
+
+      $('#checkoutMain').hidden = true;
+      showReceipt(done.ref);
+
+      btn.disabled = false;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      /* nothing else to do for card orders - Paystack handled the payment */
+    });
+  });
 
   document.addEventListener('cart:change', paint);
   paint();
+  paintReceiptList();
 });

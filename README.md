@@ -1,198 +1,245 @@
-# Ayoola Enterprises — Jumia-style online shop
+# Ayoola Enterprises — food delivery in Akure
 
-A complete, responsive e-commerce storefront for **Ayoola Enterprises** (foodstuffs,
-frozen fish, poultry, drinks and wholesale bundles). Plain HTML, CSS and JavaScript —
-no build step, no monthly fees. It runs on any static host (Cloudflare Pages, Netlify,
-GitHub Pages, or a normal web server).
+A complete, responsive online shop for **Ayoola Enterprises**, food vendor in
+**Akure, Ondo State** — foodstuffs, frozen fish, poultry, drinks, oils and
+wholesale bundles, with **Paystack card payments** in test mode.
 
-The colour system and typography are the same as your existing Ayoola Enterprise site:
-near-black ground, warm off-white type, one burnt-orange accent, hairline borders, and
-the Instrument Serif + Archivo fonts (bundled in `assets/fonts/`).
-
----
-
-## 0. Colours and fonts
-
-| Token | Value | Used for |
-|---|---|---|
-| `--ground` | `#0b0b0c` | page background |
-| `--surface` | `#111113` | cards, panels, header search |
-| `--surface-2` | `#17171a` | raised blocks, image placeholders |
-| `--paper` | `#e9e7e2` | headings and prices |
-| `--muted` | `#8a8781` | secondary text |
-| `--line` | `rgba(233,231,226,.14)` | every border |
-| `--accent` | `#c2600f` | buttons, badges, links, highlights |
-| `--accent-soft` | `#e08a3c` | hover, discounts, italic emphasis |
-| `--ok` | `#5f9e73` | confirmations, discounts |
-
-* **Instrument Serif** — headings, prices on the product page, wordmark
-* **Archivo** — body copy, buttons, form fields
-* **ui-monospace** — eyebrows, labels, counters, references, prices on cards
-
-Everything is defined once at the top of `assets/css/site.css` under `:root`, so
-re-tinting the whole shop means editing those nine lines.
+Plain HTML, CSS and JavaScript. No build step, no frameworks, no monthly fees.
+Deploys to Cloudflare Pages, Netlify, GitHub Pages or any normal web host.
 
 ---
 
 ## 1. Run it
 
-Double-click nothing — just serve the folder:
+```bash
+python -m http.server 8765     # then open http://localhost:8765
+```
+
+Pages: `index.html` (home), `category.html` (list and filters),
+`product.html`, `cart.html`, `checkout.html`, `wholesale.html`,
+`payment-test.html` (payment check), `404.html`.
+
+---
+
+## 2. Card payments with Paystack — already working
+
+The site takes card payments through **Paystack**, using your keys:
+
+```
+paystackPublicKey: 'pk_test_ce6f0a13daed65eaf34d39fdd3a2ba9e53db8e3d',   // in catalog.js
+```
+
+The public key is all the browser needs. Paystack's Inline JS opens a secure
+popup, takes the card, and the transaction appears in your **Paystack dashboard
+under Transactions**. Nothing else is required, and in test mode no real money
+moves.
+
+> Earlier confusion resolved: the keys you gave are **Paystack** keys, not Stripe.
+> `api.paystack.co` accepts them; `api.stripe.com` rejects them with
+> `401 Invalid API Key`. Check your **Paystack** dashboard, not Stripe, for test
+> transactions.
+
+### Test card
+
+| Field | Value |
+|---|---|
+| Card number | `4084084084084081` |
+| Expiry | any future date, e.g. `12/30` |
+| CVC | `123` |
+| Email | anything |
+
+### Check it any time
+
+Open **`/payment-test.html`** — it lists the public key, confirms the Paystack
+script loaded, and has a **Pay now with Paystack** button that opens the real
+popup with your own amount and reference. Delete this page any time; it is
+`noindex` and not linked from the shop.
+
+### Optional: server-side verification
+
+`paystack-worker.js` verifies a payment after the customer pays and receives
+Paystack webhooks. Without it the shop trusts the customer's callback, which is
+fine while testing. To add it:
 
 ```bash
-# from this folder
-python -m http.server 8765
-# then open http://localhost:8765
+npm init -y
+npx wrangler init ayoola-payments --type javascript
+cd ayoola-payments
+copy ..\paystack-worker.js  src\index.js
+
+npx wrangler secret put PAYSTACK_SECRET_KEY   # paste sk_test_...
+npx wrangler deploy
 ```
 
-Or drag the folder onto [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer)
-in VS Code. Opening `index.html` directly from disk also works.
+Then paste the printed URL into `catalog.js` as `paystackEndpoint`, and in
+Paystack set **Settings › API Keys & Integration › Business Notification URL**
+to `https://ayoola-payments.YOUR-NAME.workers.dev/hook`.
 
-## 2. Files
+### Going live
 
-```
-index.html         Home page (hero carousel, flash sale, categories, deal tabs)
-category.html      Listing page: filters, sorting, search results, pagination
-product.html       Product detail page (pack sizes, quantity, add to cart)
-cart.html          Cart with quantity controls and promo codes
-checkout.html      Address, payment method, order summary, confirmation
-wholesale.html     Bulk quote form, about us, delivery, payments, FAQ, contact
-404.html           Not-found page
+Swap in `pk_live_…` in `catalog.js` and `sk_live_…` via
+`npx wrangler secret put PAYSTACK_SECRET_KEY`. No code changes. Amounts are sent
+in **kobo** (naira × 100) with currency **NGN**.
 
-assets/css/site.css      All styling (Atlas dark theme, orange accent)
-assets/fonts/            Instrument Serif + Archivo woff2 (bundled, no CDN needed)
-assets/js/catalog.js  ←  EDIT THIS: your stock, prices, phone, bank details
-assets/js/store.js      Header, footer, cart engine, product cards, drawer
-assets/js/home.js       Home page widgets
-assets/js/category.js   Filtering, sorting, search, pagination
-assets/js/product.js    Product detail behaviour
-assets/js/cart.js       Cart page
-assets/js/checkout.js   Checkout, validation, order confirmation
-assets/js/wholesale.js  Quote form and help page
+### The secret key rule
 
-robots.txt / sitemap.xml   SEO basics (update the domain inside sitemap.xml)
-```
+`sk_test_…` / `sk_live_…` must never appear in this folder. It belongs only in
+the Worker via `npx wrangler secret put`. The keys were also pasted into a chat,
+so rotate them in the Paystack dashboard before you go live.
+## 3. How an order reaches you without a gateway
 
-## 3. Make it yours — `assets/js/catalog.js`
+Exactly how your first Ayoola Enterprise site worked, and it still runs
+alongside card payments:
 
-This is the only file you must edit to run a real business.
+1. Customer fills in details and presses **Place order**
+2. Order saved, **printable receipt appears instantly** with a reference like
+   `AE-20261009-6551`, including your bank details
+3. A **pre-written email draft opens** addressed to
+   `olufunmilayobolanle@gmail.com`, plus **WhatsApp** and
+   **Print / Save as PDF**
+4. Past orders stay listed at the bottom of the page
+
+Optional: set `orderEndpoint` in `catalog.js` to a URL that accepts a POST
+(Google Apps Script, Formspree, another Worker) and orders are also sent there
+automatically.
+
+---
+
+## 4. Make it yours — assets/js/catalog.js
 
 ```js
-const CONFIG = {
-  orderEndpoint: '',              // optional: URL that receives orders as JSON
-  phone: '+234 800 000 0000',     // ← your number
-  whatsapp: '2348000000000',      // ← digits only, no +
-  email: 'orders@ayoolaenterprises.ng',   // ← your email
-  bank: { bank: 'Bank Name', accountName: 'Ayoola Enterprises', accountNumber: '0000000000' },
-  deliveryFee: 3500,
-  freeDeliveryOver: 50000,        // free delivery above this amount
-  flashSaleEnds: null,            // e.g. '2026-12-31T23:59:00'
-  showPriceNotice: true,          // set false once real prices are in
-};
+phone: '08060157605',
+whatsapp: '2348060157605',                  // digits only, no +
+email: 'olufunmilayobolanle@gmail.com',
+city: 'Akure',
+state: 'Ondo',
+areas: ['Akure township','Alagbaka','Ibara','Oke-Ako','Ilesha',
+        'Ile Alafia','Oba Palace area','Ado Ekiti road','Federal Palace way'],
+deliveryFee: 2500,
+freeDeliveryOver: 30000,                    // free above this inside Akure
+sameDayCutoff: '2pm',
+currency: 'NGN',
+paystackPublicKey: 'pk_test_ce6f0a13daed65eaf34d39fdd3a2ba9e53db8e3d',
+paystackEndpoint: '',                       // optional Worker URL
+orderEndpoint: '',                          // optional order receiver
+showPriceNotice: true,                      // false once real prices are in
+bank: { bank: 'Bank Name', accountName: 'Ayoola Enterprises', accountNumber: '0000000000' },
 ```
 
-Products are plain objects:
+**Prices are still placeholders.** The home page shows a warning ribbon until you
+replace them, then set `showPriceNotice: false`.
+
+A product looks like this:
 
 ```js
 { id:'rice50', cat:'foodstuffs', name:'Long Grain Parboiled Rice',
-  unit:'per bag', brand:'Olam', emoji:'🍚', hue:38,
+  unit:'per bag', brand:'Olam', hue:38,
+  blurb:'Fortified parboiled long grain rice...',
   sizes:[ {label:'5kg', price:9500},
           {label:'25kg', price:44000},
-          {label:'50kg', price:85000, was:92000} ] }   // `was` = old price for the
-                                                          // discount badge
+          {label:'50kg', price:85000, was:92000} ] }   // `was` = discount badge
 ```
 
-* `id` — unique code used by the cart. Keep it short, no spaces.
-* `cat` — must match a category id (`foodstuffs`, `frozen`, `poultry`, `drinks`,
-  `oils`, `noodles`, `snacks`, `bundles`). Add new categories freely in `CATEGORIES`.
-* `emoji` + `hue` — the placeholder photo (a coloured card with an icon). Products
-  with several sizes automatically get size buttons, and `was` prices automatically
-  produce a “−12%” badge and a strikethrough.
+---
 
-### Using real photos
+## 5. Product photos
 
-Drop JPG/PNG files into `assets/img/products/` named after the product id
-(`rice50.jpg`, `ftilapia.jpg`…). To use them instead of the dark placeholder card,
-change the `art()` function at the bottom of `catalog.js`:
+45 real photographs live in `assets/img/products/`, named after the product id
+(`rice50.jpg`, `ftilapia.jpg`, `malt.jpg`…), loaded automatically with a dark
+placeholder fallback so a missing file never breaks a page.
+
+**Replace them with photos of your own stock** — same filenames, same folder.
+
+Where the current ones came from: Wikimedia Commons and Flickr via Openverse,
+under Creative Commons or public domain (mostly CC0). Several are generic
+(food, crates, cold store) rather than exact products, which is exactly why
+swapping in your own pictures is worth doing.
+
+---
+
+## 6. Logo
+
+Header and footer use your logo — the gold towers mark plus the
+`AYOOLA / ENTERPRISE` wordmark in gold, drawn as SVG so it is sharp at any size.
+
+To use your exact file, save it as `assets/img/logo.png` and replace the body
+of `logoMark()` near the top of `assets/js/store.js` with:
 
 ```js
-function art(p) {
-  return 'assets/img/products/' + p.id + '.jpg';   // falls back if missing
-}
+return '<img src="assets/img/logo.png" alt="" width="40" height="36">';
 ```
 
-Or keep both, with an automatic fallback:
+---
 
-```js
-function art(p) {
-  return 'assets/img/products/' + p.id + '.jpg';
-}
-// and in store.js, after rendering an <img>: on error, swap in the placeholder.
-```
+## 7. Colours and fonts
 
-## 4. Taking real orders
+Same system as your original Ayoola Enterprise site.
 
-Checkout validates the form, generates a reference like `AE-20261008-4895`, empties
-the cart and shows the customer:
+| Token | Value | Used for |
+|---|---|---|
+| `--ground` | `#0b0b0c` | page background |
+| `--surface` / `--surface-2` | `#111113` / `#17171a` | cards, panels |
+| `--paper` | `#e9e7e2` | headings, prices |
+| `--muted` | `#8a8781` | secondary text |
+| `--line` | `rgba(233,231,226,.14)` | every border |
+| `--accent` | `#c2600f` | buttons, badges, links |
+| `--accent-soft` | `#e08a3c` | hover, discounts |
+| `--ok` | `#5f9e73` | confirmations |
 
-1. their full order summary and total,
-2. your bank details plus the amount and reference to quote,
-3. a **“Send order on WhatsApp”** button that opens WhatsApp with the whole order
-   pre-written,
-4. an **“Email the order instead”** button that opens their mail app with the same
-   details addressed to you.
+Gold wordmark: `#e9cd8a`. Instrument Serif and Archivo are bundled in
+`assets/fonts/`, so no CDN is needed. Re-tinting the shop means editing nine
+lines at the top of `assets/css/site.css`.
 
-That means orders reach you even with no server. If you would rather have them
-arrive automatically, set `orderEndpoint` in `catalog.js` to a URL that accepts a
-JSON POST — a Google Apps Script web app, a Formspree form, or a Cloudflare Worker:
+---
 
-```js
-orderEndpoint: 'https://script.google.com/macros/s/AKfy.../exec',
-```
+## 8. SEO
 
-The site then POSTs the full order object (`ref`, `name`, `phone`, `email`, `address`,
-`items[]`, `total`, …) every time an order is placed.
+**On page** — Akure-focused title and meta description on every page, an `h1` on
+each page, a "Food delivery in Akure, Ondo State" block with your delivery
+areas, a six-question FAQ, canonical links, Open Graph and Twitter tags,
+`robots.txt`, `sitemap.xml`, alt text on every product image, lazy loading.
 
-## 5. Promo codes
+**Structured data** — `Store` + `GroceryStore` + `FoodEstablishment` with your
+phone, email, Akure/Ondo address, Akure coordinates (7.2506, 5.1973), opening
+hours, service radius and full catalogue; plus `WebSite` and `FAQPage`.
 
-`cart.js` and `checkout.js` share this block — add your own codes:
+**For a real top-five ranking on "food delivery Akure"** — no one can promise
+that from code, but these decide it:
 
-```js
-const PROMOS = { AYOOLA10: 10, WELCOME5: 5 };   // number = percent off
-```
+1. **Google Business Profile** matters more than the website. List Ayoola
+   Enterprises as a food store in Akure with your real address, hours, phone and
+   photos, and collect 20+ reviews.
+2. Identical name, address and phone on the website, Google Business Profile,
+   Facebook, Instagram and the WhatsApp Business catalogue.
+3. Accurate delivery times and fees on the page — searchers filter on
+   "same-day", "delivery fee", "open now".
+4. Your own photographs of actual stock and your rider.
+5. Local links: Akure food blogs, restaurant pages, community groups, event
+   planners, market associations.
+6. Regular WhatsApp Business and Facebook posts of real deliveries.
+7. Google Search Console, submit `sitemap.xml`, replace the placeholder prices.
 
-## 6. Publishing
+---
 
-**Cloudflare Pages** (what your current site uses): push this folder to a GitHub repo
-and connect it — build command empty, output directory `/`. Or drag the folder onto
-the Cloudflare Pages direct-upload page.
+## 9. Before you go live
 
-Any other host: upload every file and subfolder, keep the folder structure, done.
+- [ ] Rotate the Paystack keys (they were pasted into a chat) before going live
+- [ ] Optionally deploy `paystack-worker.js` and paste its URL into `paystackEndpoint`
+- [ ] Test with `/payment-test.html`, then with card `4084084084084081`
+- [ ] Replace the placeholder prices and pack sizes, set `showPriceNotice: false`
+- [ ] Put your real bank details in `CONFIG.bank`
+- [ ] Replace the 45 product photos with your own
+- [ ] Replace the owner story on `wholesale.html#about`
+- [ ] Update the bulk-discount table and delivery fee
+- [ ] Change the domain inside `sitemap.xml`
+- [ ] Set up the Google Business Profile for Akure
 
-Before going live:
+---
 
-- [ ] replace `phone`, `whatsapp`, `email` and the bank details
-- [ ] replace all placeholder prices and pack sizes
-- [ ] set `showPriceNotice: false`
-- [ ] put your own domain in `sitemap.xml` and add the `Store` JSON-LD phone/email
-      in `index.html`
-- [ ] edit the bulk-discount table and the owner story on `wholesale.html`
-- [ ] add your real photos and switch `art()` to use them
+## 10. Publishing
 
-## 7. What is included
+**Cloudflare Pages** (what your current site uses): push this folder to a GitHub
+repository, connect it in Cloudflare Pages, leave the build command empty and set
+the output directory to `/`. Or drag the folder onto the direct-upload page.
 
-* Dark "Atlas" theme matching your existing site: top bar, wordmark, big search,
-  category nav, orange promo strip
-* Hero carousel with auto-play and arrows, plus two side promo cards
-* Flash sale row with a live countdown timer
-* Category tiles, tabbed deal/popular/best-seller panels, top-deals and
-  best-seller blocks, wholesale banner, “how ordering works”
-* Listing page with category / price / deal / bulk / brand filters, six sort orders,
-  active-filter chips, pagination, empty state
-* Product pages with pack-size picker, quantity stepper, related products
-* Slide-out cart drawer, full cart page, promo codes
-* Checkout with validation, Nigerian state list, two payment methods, bank
-  details, order summary and a printable confirmation screen
-* Wholesale quote form that opens WhatsApp pre-filled, plus delivery, payments,
-  returns, FAQ and contact sections
-* Mobile responsive (hamburger menu, 2-column grid, off-canvas filters)
-* Lightweight: no frameworks, no external requests, no tracking
+Any other host: upload the folder with its structure intact and you are done.

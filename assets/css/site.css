@@ -86,8 +86,7 @@ h2{font-family:var(--serif);font-size:clamp(1.4rem,2.4vw,2rem);line-height:1.1;l
 .head{background:var(--ground);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:700}
 .head .wrap{display:flex;align-items:center;gap:clamp(.8rem,2.4vw,2rem);padding-block:.8rem}
 .logo{display:flex;align-items:center;gap:.6rem;flex:0 0 auto}
-.logo-img-wrap{display:none;align-items:center}
-.logo-img-wrap img{height:38px;width:auto;display:block}
+.logo-mark-wrap{display:flex;align-items:center}
 .logo-mark{display:block;flex:0 0 auto}
 .logo-text b{
   display:block;font-family:var(--sans);font-size:1.12rem;font-weight:600;line-height:1;
@@ -169,8 +168,6 @@ h2{font-family:var(--serif);font-size:clamp(1.4rem,2.4vw,2rem);line-height:1.1;l
 .btn-y{background:var(--paper);border-color:var(--paper);color:var(--ground);font-weight:500}
 .btn-y:hover{background:#fff;border-color:#fff;color:#000}
 .btn-ghost:hover{border-color:var(--paper)}
-.btn-dark{background:var(--paper);border-color:var(--paper);color:var(--ground);font-weight:500}
-.btn-dark:hover{background:#fff;border-color:#fff}
 .btn-block{width:100%}
 .btn-sm{padding:.45rem .7rem;font-size:.78rem}
 .btn-lg{padding:.85rem 1.6rem;font-size:.92rem}
@@ -469,7 +466,51 @@ h2{font-family:var(--serif);font-size:clamp(1.4rem,2.4vw,2rem);line-height:1.1;l
 .mini .ph img{width:100%;height:100%;object-fit:cover}
 
 /* ===========================================================
-   16. CONFIRMATION
+   15b. CARD PAYMENT (PAYSTACK)
+   =========================================================== */
+.paystack-test{
+  display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;
+  border:1px solid var(--line);border-left:2px solid var(--ok);border-radius:var(--radius);
+  background:var(--surface-2);padding:.7rem .9rem;margin-bottom:.6rem;font-size:.76rem;color:var(--muted);
+}
+.paystack-test .mono{color:var(--ok);letter-spacing:.1em}
+.paystack-test b{color:var(--paper);font-weight:500}
+.pay-msg{display:none;margin-top:.6rem;font-size:.76rem;color:var(--bad)}
+.pay-msg.on{display:block}
+.pay-msg.err{color:var(--bad)}
+
+/* ===========================================================
+   16. RECEIPT  (same document as your first site)
+   =========================================================== */
+.rcpt{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.rcpt-head{display:flex;justify-content:space-between;gap:1.2rem;flex-wrap:wrap;padding:1.2rem;border-bottom:1px solid var(--line)}
+.rcpt-brand b{display:block;font-family:var(--sans);font-size:1.1rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#e9cd8a}
+.rcpt-brand p{font-family:var(--mono);font-size:.58rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-top:.3rem}
+.rcpt-meta{text-align:right;font-family:var(--mono);font-size:.64rem;letter-spacing:.06em;color:var(--muted)}
+.rcpt-meta b{display:block;color:var(--accent-soft);font-size:.85rem;letter-spacing:.1em;margin-bottom:.25rem}
+.rcpt-parties{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;padding:1.2rem;border-bottom:1px solid var(--line)}
+.rcpt-parties h4{font-family:var(--mono);font-size:.58rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 .4rem;font-weight:400}
+.rcpt-parties p{font-size:.84rem;color:var(--ink-2,#c3bfb7);line-height:1.7}
+.rcpt-table{width:100%;border-collapse:collapse;font-size:.84rem}
+.rcpt-table th{font-family:var(--mono);font-size:.56rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:400;text-align:left;padding:.6rem 1.2rem;border-bottom:1px solid var(--line)}
+.rcpt-table td{padding:.6rem 1.2rem;border-bottom:1px solid var(--line-soft);color:var(--ink-2,#c3bfb7);vertical-align:top}
+.rcpt-table td.num{text-align:right;white-space:nowrap;font-family:var(--mono);font-size:.78rem}
+.rcpt-table td.name{color:var(--paper)}
+.rcpt-table tfoot td{border-bottom:0;padding:.5rem 1.2rem}
+.rcpt-table tfoot .lbl{color:var(--muted);font-size:.78rem}
+.rcpt-table tfoot .tot td{border-top:1px solid var(--line);padding-top:.7rem;font-weight:600;color:var(--paper);font-size:.95rem}
+.rcpt-table tfoot .tot .lbl{color:var(--paper)}
+.rcpt-foot{padding:1.2rem;border-top:1px solid var(--line);background:var(--surface-2)}
+.rcpt-foot h4{font-family:var(--mono);font-size:.56rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 .5rem;font-weight:400}
+.rcpt-foot p{font-size:.84rem;color:var(--ink-2,#c3bfb7);margin-bottom:.5rem}
+.rcpt-foot p:last-child{margin-bottom:0}
+.rcpt-list{display:grid;gap:.5rem}
+.rcpt-list a{display:flex;justify-content:space-between;gap:1rem;padding:.6rem .9rem;border:1px solid var(--line);border-radius:var(--radius);font-size:.82rem;background:var(--surface)}
+.rcpt-list a:hover{border-color:var(--accent)}
+.rcpt-list span{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+
+/* ===========================================================
+   17. CONFIRMATION
    =========================================================== */
 .done{max-width:680px;margin:1.6rem auto;text-align:center}
 .done .tick{
