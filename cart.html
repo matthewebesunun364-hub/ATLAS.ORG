@@ -1,0 +1,71 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Your cart | Ayoola Enterprises</title>
+<meta name="robots" content="noindex,follow">
+<meta name="theme-color" content="#0b0b0c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230b0b0c'/%3E%3Cpath d='M32 10l7 6v34l-7 6-7-6V16z' fill='%23e3c173'/%3E%3Cpath d='M18 24l6 5v27l-6 5-6-5V29z' fill='%23c9a55c'/%3E%3Cpath d='M46 21l6 5v30l-6 5-6-5V26z' fill='%23d9b06a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/site.css?v=3">
+</head>
+<body data-page="cart">
+
+<div id="site-header"></div>
+
+<main class="sec">
+  <div class="wrap">
+    <nav class="crumbs"><a href="index.html">Home</a><span>&rsaquo;</span><span>Cart</span></nav>
+
+    <div class="sec-h">
+      <h1>Shopping cart</h1>
+      <button class="linkbtn" type="button" data-clear-cart>Empty cart</button>
+    </div>
+
+    <div class="cart-page">
+      <div>
+        <div class="promo-code">
+          <input type="text" placeholder="Have a promo code?" data-promo aria-label="Promo code">
+          <button class="btn btn-o" type="button" data-promo-go>Apply</button>
+        </div>
+        <div data-vouch></div>
+        <div class="panel-box"><div data-lines></div></div>
+        <div style="margin-top:1rem">
+          <a class="btn" href="category.html">&larr; Continue shopping</a>
+        </div>
+      </div>
+
+      <aside>
+        <div class="panel-box summary">
+          <div class="hd">Order summary</div>
+          <div class="row"><span>Subtotal (<span data-count>0</span> items)</span><span data-sub>&#8358;0</span></div>
+          <div class="row"><span>Delivery in Akure</span><span data-fee>&#8358;0</span></div>
+          <div class="row"><span>Discount</span><span data-disc>&#8358;0</span></div>
+          <div class="row tot"><span>Total</span><span data-tot>&#8358;0</span></div>
+          <div class="foot">
+            <a class="btn btn-o btn-block btn-lg" href="checkout.html">Proceed to checkout</a>
+            <p class="mono" style="margin-top:.7rem;text-align:center">Free delivery above <b id="freeOver"></b></p>
+          </div>
+        </div>
+
+        <div class="panel-box" style="margin-top:1rem">
+          <div class="hd">Need a hand?</div>
+          <div style="padding:1rem">
+            <p style="font-size:.8rem;color:var(--muted)">
+              Tell us who the food is for and your budget. We build the basket and call you back within 24 hours.
+            </p>
+            <a class="btn btn-y btn-block btn-sm" style="margin-top:.8rem" href="wholesale.html#quote">Request a basket</a>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<div id="site-footer"></div>
+
+<script src="assets/js/catalog.js?v=3"></script>
+<script src="assets/js/store.js?v=3"></script>
+<script src="assets/js/cart.js?v=3"></script>
+</body>
+</html>
