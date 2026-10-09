@@ -2,7 +2,7 @@
 
 A complete, responsive online shop for **Ayoola Enterprises**, food vendor in
 **Akure, Ondo State** — foodstuffs, frozen fish, poultry, drinks, oils and
-wholesale bundles, with **Paystack card payments** in test mode.
+wholesale bundles, with **Paystack card payments**.
 
 Plain HTML, CSS and JavaScript. No build step, no frameworks, no monthly fees.
 Deploys to Cloudflare Pages, Netlify, GitHub Pages or any normal web host.
@@ -16,76 +16,38 @@ python -m http.server 8765     # then open http://localhost:8765
 ```
 
 Pages: `index.html` (home), `category.html` (list and filters),
-`product.html`, `cart.html`, `checkout.html`, `wholesale.html`,
-`payment-test.html` (payment check), `404.html`.
+`product.html`, `cart.html`, `checkout.html`, `wholesale.html`, `404.html`.
 
 ---
 
-## 2. Card payments with Paystack — already working
+## 2. Card payments with Paystack
 
-The site takes card payments through **Paystack**, using your keys:
+Card payments run through **Paystack**. The site holds only your public key
+(`pk_…`), which opens the secure payment popup. The payment is then verified by
+the Make automation, which is the only place your secret key lives.
 
-```
-paystackPublicKey: 'pk_test_ce6f0a13daed65eaf34d39fdd3a2ba9e53db8e3d',   // in catalog.js
-```
+* Configuration: `paystackPublicKey` in `assets/js/catalog.js`
+* Verification: your Make webhook (`makeWebhook`) calls Paystack's verify API
+  and answers the website with `{"paid": true|false}`
+* Receipt: stamped **PAYMENT VERIFIED** only when Make confirms the money
 
-The public key is all the browser needs. Paystack's Inline JS opens a secure
-popup, takes the card, and the transaction appears in your **Paystack dashboard
-under Transactions**. Nothing else is required, and in test mode no real money
-moves.
+The keys you supplied are **Paystack** keys, not Stripe. `api.paystack.co`
+accepts them; `api.stripe.com` rejects them with `401 Invalid API Key`.
 
-> Earlier confusion resolved: the keys you gave are **Paystack** keys, not Stripe.
-> `api.paystack.co` accepts them; `api.stripe.com` rejects them with
-> `401 Invalid API Key`. Check your **Paystack** dashboard, not Stripe, for test
-> transactions.
+### Optional backup
 
-### Test card
-
-| Field | Value |
-|---|---|
-| Card number | `4084084084084081` |
-| Expiry | any future date, e.g. `12/30` |
-| CVC | `123` |
-| Email | anything |
-
-### Check it any time
-
-Open **`/payment-test.html`** — it lists the public key, confirms the Paystack
-script loaded, and has a **Pay now with Paystack** button that opens the real
-popup with your own amount and reference. Delete this page any time; it is
-`noindex` and not linked from the shop.
-
-### Optional: server-side verification
-
-`paystack-worker.js` verifies a payment after the customer pays and receives
-Paystack webhooks. Without it the shop trusts the customer's callback, which is
-fine while testing. To add it:
-
-```bash
-npm init -y
-npx wrangler init ayoola-payments --type javascript
-cd ayoola-payments
-copy ..\paystack-worker.js  src\index.js
-
-npx wrangler secret put PAYSTACK_SECRET_KEY   # paste sk_test_...
-npx wrangler deploy
-```
-
-Then paste the printed URL into `catalog.js` as `paystackEndpoint`, and in
-Paystack set **Settings › API Keys & Integration › Business Notification URL**
-to `https://ayoola-payments.YOUR-NAME.workers.dev/hook`.
+`paystack-worker.js` is a Cloudflare Worker that can verify payments and receive
+Paystack webhooks if the automation is ever paused. Deploy it, then set its URL
+as `paystackEndpoint`. You do not need it while Make is running.
 
 ### Going live
 
-Swap in `pk_live_…` in `catalog.js` and `sk_live_…` via
-`npx wrangler secret put PAYSTACK_SECRET_KEY`. No code changes. Amounts are sent
-in **kobo** (naira × 100) with currency **NGN**.
+1. Paystack &rsaquo; Settings &rsaquo; API Keys &mdash; switch to live keys
+2. Put `pk_live_…` in `paystackPublicKey`
+3. Put `sk_live_…` in the Make HTTP module header (and in the Worker if used)
+4. Test one real order before announcing the shop
 
-### The secret key rule
-
-`sk_test_…` / `sk_live_…` must never appear in this folder. It belongs only in
-the Worker via `npx wrangler secret put`. The keys were also pasted into a chat,
-so rotate them in the Paystack dashboard before you go live.
+Both keys were pasted into a chat during setup, so roll them before going live.
 ## 3. How an order reaches you without a gateway
 
 Exactly how your first Ayoola Enterprise site worked, and it still runs
@@ -223,9 +185,9 @@ that from code, but these decide it:
 
 ## 9. Before you go live
 
-- [ ] Rotate the Paystack keys (they were pasted into a chat) before going live
-- [ ] Optionally deploy `paystack-worker.js` and paste its URL into `paystackEndpoint`
-- [ ] Test with `/payment-test.html`, then with card `4084084084084081`
+- [ ] Switch to Paystack live keys and rotate the test keys (they were pasted into a chat)
+
+
 - [ ] Replace the placeholder prices and pack sizes, set `showPriceNotice: false`
 - [ ] Put your real bank details in `CONFIG.bank`
 - [ ] Replace the 45 product photos with your own

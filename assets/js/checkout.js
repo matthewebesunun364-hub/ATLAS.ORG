@@ -18,6 +18,7 @@
    =========================================================== */
 document.addEventListener('DOMContentLoaded', function () {
   const S = window.SHOP, A = S.A, C = S.C, $ = S.$, $$ = S.$$;
+  const Make = window.AYOOLA_MAKE || { sendOrder: () => Promise.resolve({}), sendPayment: () => Promise.resolve({}) };
 
   const PROMO_KEY = 'ayoola.promo.v1';
   const PROMOS = { AYOOLA10: 10, WELCOME5: 5 };
@@ -42,14 +43,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   $$('[data-wa]').forEach((el) => { el.href = S.WA; el.target = '_blank'; el.rel = 'noopener'; });
 
-  /* ---------- Paystack ----------
-     The public key is all the browser needs: Paystack's Inline JS
-     opens its own secure popup and handles the card. That is enough
-     to take a payment in test mode.
-
-     paystackEndpoint (optional) is used after the popup closes, to
-     VERIFY the payment server-side. Without it the order is trusted
-     on the customer's word, which is fine while testing.        */
+  /* ---------- Make verification ----------
+     Make holds the Paystack secret key, verifies the payment, and
+     replies with {"paid": true|false}. The site never touches the
+     secret key itself.                                          */
   const payCard = $('[data-pay-card]');
   const pkBox = $('[data-paystack-test]');
   const PK = C.paystackPublicKey;
@@ -73,9 +70,8 @@ document.addEventListener('DOMContentLoaded', function () {
       box.remove();
     }
   } else if (window.PaystackPop) {
-    $('[data-card-note]').textContent = PK.startsWith('pk_test_')
-      ? 'Opens a secure Paystack popup. Test mode is on, no real money.'
-      : 'Opens a secure Paystack popup.';
+    $('[data-card-note]').textContent =
+      'Opens a secure Paystack popup where you enter your card details.';
   } else {
     $('[data-card-note]').textContent =
       'Paystack is still loading. If it does not load, check your internet connection.';
@@ -269,6 +265,23 @@ document.addEventListener('DOMContentLoaded', function () {
       '</tr>';
     }).join('');
 
+    /* payment line: verified, awaiting verification, or not paid */
+    let payLine = '';
+    if (o.pay === 'card') {
+      if (o.payment && o.payment.verified === true) {
+        payLine = '<p><b style="color:var(--ok)">PAYMENT VERIFIED</b> - confirmed with Paystack by our ' +
+          'payment automation.</p>';
+      } else if (o.payment && o.payment.verified === false) {
+        payLine = '<p><b style="color:var(--bad)">PAYMENT NOT CONFIRMED</b> - Paystack did not return a ' +
+          'successful payment for reference ' + S.esc(o.payment.id) + '. Please call us on ' + C.phone + '.</p>';
+      } else if (o.payment) {
+        payLine = '<p>Payment made with card, reference <strong>' + S.esc(o.payment.id) + '</strong>. ' +
+          'We are confirming it with Paystack and will call you within a few minutes.</p>';
+      } else {
+        payLine = '<p>Card payment was started but not confirmed.</p>';
+      }
+    }
+
     return '' +
     '<div class="rcpt">' +
       '<div class="rcpt-head">' +
@@ -307,9 +320,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       '<div class="rcpt-foot">' +
         (o.pay === 'card'
-          ? '<h4>Payment</h4><p>Card payment ' + S.esc(o.payment ? o.payment.status : 'received') +
-            (o.payment && o.payment.live ? '' : ' in test mode - no real money was taken') +
-            '.</p>'
+          ? '<h4>Payment</h4>' + payLine
           : o.pay === 'transfer'
           ? '<h4>How to pay</h4>' +
             '<p>Transfer <strong>' + A.money(o.total) + '</strong> to:</p>' +
@@ -407,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function () {
             amount: amount,
             live: !PK.startsWith('pk_test_'),
           };
-          order.status = 'Paid by card' + (order.payment.live ? '' : ' (test mode)');
+          order.status = 'Paid by card';
           resolve(true);
         },
         onCancel: function () {
@@ -421,27 +432,46 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  /* optional server-side verification, once the Worker is deployed */
+  /* ---------- verification: Make first, Worker as fallback ---------- */
   async function verifyPaystack(order) {
-    if (!C.paystackEndpoint || !order.payment) return order;
-    try {
-      const res = await fetch(C.paystackEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reference: order.payment.id || order.ref }),
-      });
-      const data = await res.json();
-      if (res.ok && data.paid) {
+    /* 1) ask Make to verify on Paystack (it holds the secret key) */
+    if (C.makeWebhook) {      const res = await Make.sendPayment(order);
+      order.automation = { sent: true, ok: res.ok, timedOut: !!res.timedOut, message: res.message || '' };
+      order.payment = order.payment || {};
+      if (res.paid === true) {
         order.payment.verified = true;
-        order.payment.serverAmount = data.amount;
-      } else if (res.ok) {
+        order.payment.serverAmount = res.serverAmount;
+        order.status = 'Paid by card - payment verified by our payment automation';
+      } else if (res.verifyStatus && res.verifyStatus !== 'unknown' && res.paid === false) {
         order.payment.verified = false;
-        order.payment.serverStatus = data.status;
+        order.status = 'Card payment not confirmed by Paystack (' + res.verifyStatus + ')';
       } else {
-        order.payment.verifyError = data.error;
+        order.payment.verified = null;              /* automation has not answered yet */
       }
-    } catch (e) {
-      order.payment.verifyError = e.message;
+      return order;
+    }
+
+    /* 2) no automation configured: use the Worker verifier instead */
+    if (C.paystackEndpoint) {
+      try {
+        const res = await fetch(C.paystackEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reference: order.payment.id || order.ref }),
+        });
+        const data = await res.json();
+        if (res.ok && data.paid) {
+          order.payment.verified = true;
+          order.payment.serverAmount = data.amount;
+        } else if (res.ok) {
+          order.payment.verified = false;
+          order.payment.serverStatus = data.status;
+        } else {
+          order.payment.verifyError = data.error;
+        }
+      } catch (e) {
+        order.payment.verifyError = e.message;
+      }
     }
     return order;
   }
@@ -460,49 +490,65 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const btn = this.querySelector('[type=submit]');
     btn.disabled = true;
-    say('Please wait...');
 
-    /* card orders open Paystack first, then fall through to the same receipt flow */
-    const run = order.pay === 'card' && cardReady
-      ? payWithPaystack(order, btn)
-          .then(function (paid) { return paid ? verifyPaystack(order) : null; })
-          .then(function (o) { return o ? postOrder(order).then(function () { return order; }) : null; })
-      : postOrder(order).then(function () { return order; });
+    /* card: Paystack popup, then Make verifies the money */
+    if (order.pay === 'card' && cardReady) {
+      say('Opening secure payment...');
+      payWithPaystack(order, btn).then(function (paid) {
+        if (!paid) return null;
+        say('Checking the payment with Paystack...');
+        return verifyPaystack(order).then(function (o) {
+          return postOrder(order).then(function () { return o; });
+        });
+      }).then(finishOrder);
+      return;
+    }
 
-    run.then(function (done) {
-      if (!done) return;
-
-      window.__lastOrder = done;
-      receipts.save(done);
-      paintReceiptList();
-
-      try {
-        localStorage.setItem('ayoola.customer.v1', JSON.stringify({
-          name: done.name, phone: done.phone, email: done.email,
-          area: done.area, city: done.city, address: done.address, landmark: done.landmark,
-        }));
-      } catch (err) {}
-
-      S.cart.clear();
-
-      if (done.payment && done.payment.status === 'success') {
-        say('Payment received' + (done.payment.live ? '.' : ' (test mode - no real money).'), 'ok');
-      } else {
-        say('Your order is ready. Send the email we opened, and your receipt is below.', 'ok');
-        setTimeout(function () { window.location.href = mailDraft(done); }, 600);
-      }
-
-      $('#checkoutMain').hidden = true;
-      showReceipt(done.ref);
-
-      btn.disabled = false;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-
-      /* nothing else to do for card orders - Paystack handled the payment */
-    });
+    /* transfer / cash: no verification needed, just tell the automation */
+    say('Sending your order...');
+    Make.sendOrder(order).then(function (res) {
+      order.automation = { sent: true, ok: res.ok, message: res.message || '' };
+    }).catch(function () {}).then(function () {
+      return postOrder(order);
+    }).then(function () { return order; }).then(finishOrder);
   });
 
-  document.addEventListener('cart:change', paint);
-  paint();
+  /* one place that saves the order, prints the receipt and clears the cart */
+  function finishOrder(done) {
+    if (!done) return;
+    window.__lastOrder = done;
+    receipts.save(done);
+    paintReceiptList();
+
+    try {
+      localStorage.setItem('ayoola.customer.v1', JSON.stringify({
+        name: done.name, phone: done.phone, email: done.email,
+        area: done.area, city: done.city, address: done.address, landmark: done.landmark,
+      }));
+    } catch (err) {}
+
+    S.cart.clear();
+
+    const paid = done.payment && done.payment.status === 'success';
+    const verified = done.payment && done.payment.verified;
+
+    if (paid && verified === true) {
+      say('Payment received and verified. A copy is on its way to your email.', 'ok');
+    } else if (paid) {
+      say('Payment made. We are confirming it with Paystack and will call you shortly.', 'ok');
+    } else {
+      say('Your order is ready. Send the email we opened, and your receipt is below.', 'ok');
+      setTimeout(function () { window.location.href = mailDraft(done); }, 600);
+    }
+
+    $('#checkoutMain').hidden = true;
+    showReceipt(done.ref);
+
+    const btn = document.querySelector('#checkoutForm [type=submit]');
+    if (btn) btn.disabled = false;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  document.addEventListener('cart:change', paint);  paint();
   paintReceiptList();
 });

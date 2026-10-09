@@ -46,25 +46,42 @@ window.AYOOLA = (function () {
     freeDeliveryOver: 30000,               // free inside Akure above this
     sameDayCutoff: '2pm',
 
+    /* ---------- MAKE AUTOMATION ----------
+       The site POSTs every order here. Your Make scenario then:
+         1. verifies the payment on Paystack with your SECRET key
+            (that is why the secret key never sits in this website)
+         2. returns {"paid": true|false, ...} as the webhook response
+         3. emails the receipt to the buyer AND to you
+       The site waits a few seconds for that reply and only stamps
+       "payment verified" when Make says the money actually arrived.
+
+       Leave blank and orders still work; you just get them by
+       WhatsApp and email instead of the automation.                 */
+    makeWebhook: 'https://hook.eu1.make.com/oq0359xmobvigrqa1nsr6dr76eczrllq',
+    makeTimeout: 20000,             // ms to wait for Make to verify
+
+    /* Where the receipt copy goes. Both addresses are used by Make. */
+    sellerEmail: 'olufunmilayobolanle@gmail.com',
+    sellerName: 'Ayoola Enterprises',
+
     /* ---------- PAYMENT (Paystack) ----------
-       Card payments run through Paystack. In TEST MODE nothing is
-       charged, but the transaction shows up in your Paystack
-       dashboard under Transactions.
+       Card payments run through Paystack. The popup opens with the
+       PUBLIC key below; the payment is then verified by the Make
+       automation, which is the only place the secret key lives.
 
-         paystackPublicKey  pk_test_...   SAFE to keep in this file.
-                            It is a public key; it only opens the
-                            payment popup and cannot move money.
-         paystackEndpoint   Optional. URL of the Cloudflare Worker in
-                            paystack-worker.js, used to VERIFY the
-                            payment server-side and to receive
-                            webhooks. Test payments work without it.
+         paystackPublicKey  pk_...   SAFE to keep in this file. It
+                             only opens the payment popup and cannot
+                             move money.
+         paystackEndpoint   Optional backup. URL of the Cloudflare
+                             Worker in paystack-worker.js, used only
+                             if the Make automation is ever paused.
 
-       !! The SECRET key (sk_test_... / sk_live_...) must NOT appear
-          anywhere in this folder. It belongs in the Worker:
-              npx wrangler secret put PAYSTACK_SECRET_KEY
-          Everything here is readable by every visitor.            */
+       !! The SECRET key (sk_...) must NOT appear anywhere in this
+          folder. Everything here is readable by every visitor.
+          Going live: swap pk_test_... for pk_live_... and update
+          the secret key inside Make.                            */
     paystackPublicKey: 'pk_test_ce6f0a13daed65eaf34d39fdd3a2ba9e53db8e3d',
-    paystackEndpoint: '',         // <- paste your Worker URL here
+    paystackEndpoint: '',         // optional, only used if Make is down
     currency: 'NGN',
 
     bank: {

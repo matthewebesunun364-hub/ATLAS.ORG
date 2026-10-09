@@ -1,16 +1,14 @@
 /**
  * ============================================================
- * AYOOLA ENTERPRISES - Paystack payment endpoint (Cloudflare Worker)
+ * AYOOLA ENTERPRISES - Paystack verification (Cloudflare Worker)
  * ============================================================
- * Optional, but recommended before you go live.
+ * OPTIONAL. Your Make automation already verifies payments, so you
+ * do not need this. It is kept here as a backup in case the
+ * automation is ever paused or you want verification without Make.
  *
- * The website can take a card payment on its own using Paystack's
- * Inline JS with the PUBLIC key (pk_test_... / pk_live_...) - that
- * part is already working and needs no server.
- *
- * This Worker exists for the two things a browser must never do:
- *   1. VERIFY a payment really succeeded (public keys cannot do this)
- *   2. RECEIVE Paystack webhooks so orders are recorded automatically
+ * It holds the Paystack SECRET key (which must never be in the
+ * website), verifies a payment by reference, and receives Paystack
+ * webhooks.
  *
  * ------------------------------------------------------------
  * SET IT UP
@@ -21,29 +19,17 @@
  *   copy  <this file>  to  src/index.js
  *
  *   npx wrangler secret put PAYSTACK_SECRET_KEY
- *   # paste: sk_test_8f6aad9f256bd19f406675e440815e285392ac35
+ *   # paste your sk_test_... (or sk_live_... once you go live)
  *
  *   npx wrangler deploy
  *
- * Then in Paystack: Settings > API Keys & Integration > set your
- * "Business Notification URL" to  https://ayoola-payments.YOUR-NAME.workers.dev/hook
- *
- * Paste the Worker URL into assets/js/catalog.js as paystackEndpoint
- * and the shop will verify every payment after the customer pays.
- * Leave it empty and test payments still work, they are just trusted
- * on the customer's word.
- *
- * ------------------------------------------------------------
- * GOING LIVE: swap in sk_live_... in the dashboard + wrangler secret,
- * and pk_live_... in catalog.js. Nothing else changes.
+ * Then paste the printed URL into assets/js/catalog.js as
+ * paystackEndpoint, and in Paystack set
+ *   Settings > API Keys & Integration > Business Notification URL
+ *   to  https://ayoola-payments.YOUR-NAME.workers.dev/hook
  * ============================================================
  */
 
-const ALLOWED = {
-  'POST, OPTIONS': 1,
-};
-
-/* orders we have seen, so the webhook can be matched back */
 const seen = new Map();
 
 export default {
@@ -74,22 +60,18 @@ export default {
           at: new Date().toISOString(),
           email: data.customer && data.customer.email,
         });
-        console.log('payment ok', ref, data.amount, data.currency);
       } else if (event === 'charge.failed') {
         seen.set(ref, { ref: ref, status: 'failed', at: new Date().toISOString() });
-        console.log('payment failed', ref);
       }
 
       return json({ ok: true }, 200, cors);
     }
 
     if (request.method === 'GET') {
-      /* quick health check, handy after deploying */
       return json({
         ok: true,
         service: 'Ayoola Enterprises payments',
         hasSecret: !!env.PAYSTACK_SECRET_KEY,
-        testMode: (env.PAYSTACK_SECRET_KEY || '').startsWith('sk_test_'),
         webhook: new URL(request.url).pathname + '/hook',
         seen: Array.from(seen.values()).slice(-10),
       }, 200, cors);
@@ -105,10 +87,6 @@ export default {
 
     const reference = String(body.reference || '').slice(0, 40);
     if (!reference) return json({ error: 'reference is required' }, 400, cors);
-
-    /* ---------- 1. verify a payment ---------- */
-    const qs = new URLSearchParams();
-    qs.set('reference', reference);
 
     let pay;
     try {
@@ -135,7 +113,6 @@ export default {
       currency: d.currency,
       channel: d.channel,
       paidAt: d.paid_at,
-      testMode: secret.startsWith('sk_test_'),
       email: d.customer && d.customer.email,
     }, 200, cors);
   },
