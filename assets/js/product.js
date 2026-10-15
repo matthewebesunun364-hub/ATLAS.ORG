@@ -18,6 +18,46 @@ document.addEventListener('DOMContentLoaded', function () {
     '<a href="category.html?cat=' + p.cat + '">' + S.esc(cat ? cat.name : p.cat) + '</a><span>&rsaquo;</span>' +
     '<span>' + S.esc(p.name) + '</span>';
 
+  /* ---------- Product structured data ----------
+     No offers, prices or ratings: those are placeholder values until
+     the owner replaces them, and schema must match the page. */
+  (function () {
+    const tag = document.createElement('script');
+    tag.type = 'application/ld+json';
+    tag.id = 'product-schema';
+    tag.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'Product',
+          name: p.name,
+          description: p.blurb || (p.brand + ' ' + p.name + ', sold in Akure by Ayoola Enterprise.'),
+          category: cat ? cat.name : p.cat,
+          brand: { '@type': 'Brand', name: p.brand },
+          image: 'https://ayoola-enterprise.pages.dev/assets/img/products/' + p.id + '.jpg',
+          sku: p.id,
+          countryOfOrigin: { '@type': 'Country', name: 'Nigeria' },
+        },
+        {
+          '@type': 'WebPage',
+          name: p.name + ' | Ayoola Enterprise, Akure',
+          url: 'https://ayoola-enterprise.pages.dev/product.html?id=' + p.id,
+          inLanguage: 'en-NG',
+          isPartOf: { '@type': 'WebSite', name: 'Ayoola Enterprise', url: 'https://ayoola-enterprise.pages.dev/' },
+        },
+        {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://ayoola-enterprise.pages.dev/' },
+            { '@type': 'ListItem', position: 2, name: cat ? cat.name : p.cat, item: 'https://ayoola-enterprise.pages.dev/category.html?cat=' + p.cat },
+            { '@type': 'ListItem', position: 3, name: p.name, item: 'https://ayoola-enterprise.pages.dev/product.html?id=' + p.id },
+          ],
+        },
+      ],
+    });
+    document.head.appendChild(tag);
+  })();
+
   const off = A.discount(p);
   const first = p.sizes[0];
 

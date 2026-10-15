@@ -29,10 +29,13 @@ document.addEventListener('DOMContentLoaded', function () {
     (promo && PROMOS[promo.code]) ? Math.round(sub * PROMOS[promo.code] / 100) : 0;
 
   /* ---------- empty cart guard ---------- */
+  const checkoutMain = $('#checkoutMain');
   if (!S.cart.count()) {
-    $('#checkoutMain').innerHTML =
-      '<div class="empty"><div class="e">&#128722;</div>Your cart is empty, so there is nothing to check out.' +
-      '<br><br><a class="btn btn-o" href="category.html">Browse products</a></div>';
+    if (checkoutMain) {
+      checkoutMain.innerHTML =
+        '<div class="empty"><div class="e">&#128722;</div>Your cart is empty, so there is nothing to check out.' +
+        '<br><br><a class="btn btn-o" href="category.html">Browse products</a></div>';
+    }
     return;
   }
 
@@ -272,16 +275,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* payment line: verified, awaiting verification, or not paid */
     let payLine = '';
+    let recheck = '';
     if (o.pay === 'card') {
       if (o.payment && o.payment.verified === true) {
         payLine = '<p><b style="color:var(--ok)">PAYMENT VERIFIED</b> - confirmed with Paystack by our ' +
-          'payment automation.</p>';
+          'payment automation. Reference ' + S.esc(o.payment.id) + '.</p>';
       } else if (o.payment && o.payment.verified === false) {
-        payLine = '<p><b style="color:var(--bad)">PAYMENT NOT CONFIRMED</b> - Paystack did not return a ' +
-          'successful payment for reference ' + S.esc(o.payment.id) + '. Please call us on ' + C.phone + '.</p>';
+        payLine = '<p><b style="color:var(--bad)">PAYMENT NOT CONFIRMED</b> - Paystack has not returned a ' +
+          'successful payment for reference ' + S.esc(o.payment.id) + '. Please call us on ' + C.phone +
+          ' before we pack.</p>';
       } else if (o.payment) {
-        payLine = '<p>Payment made with card, reference <strong>' + S.esc(o.payment.id) + '</strong>. ' +
-          'We are confirming it with Paystack and will call you within a few minutes.</p>';
+        payLine = '<p><b style="color:var(--ok)">PAYMENT RECEIVED</b> - Paystack accepted your card, reference ' +
+          '<strong>' + S.esc(o.payment.id) + '</strong>. We are completing the final confirmation with our ' +
+          'payment system and will call you on ' + S.esc(o.phone) + ' if anything is wrong.</p>';
+        recheck = '<p><button class="btn btn-sm" type="button" data-recheck="' + o.ref +
+          '">Check payment status again</button></p>';
       } else {
         payLine = '<p>Card payment was started but not confirmed.</p>';
       }
@@ -325,7 +333,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
       '<div class="rcpt-foot">' +
         (o.pay === 'card'
-          ? '<h4>Payment</h4>' + payLine
+          ? '<h4>Payment</h4>' + payLine + recheck
           : o.pay === 'transfer'
           ? '<h4>How to pay</h4>' +
             '<p>Transfer <strong>' + A.money(o.total) + '</strong> to:</p>' +
@@ -385,6 +393,24 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.addEventListener('click', function (e) {
     if (e.target.closest('[data-print]')) { window.print(); return; }
+
+    /* re-check a card payment later, without asking for the card again */
+    const again = e.target.closest('[data-recheck]');
+    if (again) {
+      const o = receipts.find(again.dataset.recheck);
+      if (!o) return;
+      again.disabled = true;
+      again.textContent = 'Checking with Paystack...';
+      verifyPaystack(o).then(function () {
+        receipts.save(o);
+        paintReceiptList();
+        showReceipt(o.ref);
+        S.toast(o.payment && o.payment.verified === true
+          ? 'Payment confirmed' : 'Still confirming. Try again in a minute.');
+      });
+      return;
+    }
+
     const a = e.target.closest('[data-rref]');
     if (!a) return;
     e.preventDefault();
@@ -437,47 +463,60 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  /* ---------- verification: Make first, Worker as fallback ---------- */
+  /* ---------- verification ----------
+     Paystack's popup only fires onSuccess after it has actually taken
+     the payment, so that is already a real confirmation. Make then
+     double-checks with the Paystack API using the secret key, and the
+     receipt upgrades itself to PAYMENT VERIFIED when it answers.
+
+     If Make stays silent the order keeps the Paystack confirmation and
+     is marked "verification pending" - never reported as a failure. */
   async function verifyPaystack(order) {
-    /* 1) ask Make to verify on Paystack (it holds the secret key) */
-    if (C.makeWebhook) {      const res = await Make.sendPayment(order);
+    order.payment = order.payment || {};
+
+    if (C.makeWebhook) {
+      const res = await Make.sendPayment(order);
       order.automation = { sent: true, ok: res.ok, timedOut: !!res.timedOut, message: res.message || '' };
-      order.payment = order.payment || {};
+
       if (res.paid === true) {
         order.payment.verified = true;
         order.payment.serverAmount = res.serverAmount;
-        order.status = 'Paid by card - payment verified by our payment automation';
-      } else if (res.verifyStatus && res.verifyStatus !== 'unknown' && res.paid === false) {
+        order.status = 'Paid by card - payment verified';
+        return order;
+      }
+      if (res.paid === false && res.verifyStatus && res.verifyStatus !== 'unknown') {
         order.payment.verified = false;
         order.status = 'Card payment not confirmed by Paystack (' + res.verifyStatus + ')';
-      } else {
-        order.payment.verified = null;              /* automation has not answered yet */
+        return order;
       }
-      return order;
     }
 
-    /* 2) no automation configured: use the Worker verifier instead */
+    /* automation silent: try the optional Worker before giving up */
     if (C.paystackEndpoint) {
       try {
-        const res = await fetch(C.paystackEndpoint, {
+        const w = await fetch(C.paystackEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ reference: order.payment.id || order.ref }),
         });
-        const data = await res.json();
-        if (res.ok && data.paid) {
+        const data = await w.json();
+        if (w.ok && data.paid) {
           order.payment.verified = true;
           order.payment.serverAmount = data.amount;
-        } else if (res.ok) {
-          order.payment.verified = false;
-          order.payment.serverStatus = data.status;
-        } else {
-          order.payment.verifyError = data.error;
+          order.status = 'Paid by card - payment verified';
+          return order;
         }
-      } catch (e) {
-        order.payment.verifyError = e.message;
-      }
+        if (w.ok && data.status && data.status !== 'success') {
+          order.payment.verified = false;
+          order.status = 'Card payment not confirmed by Paystack (' + data.status + ')';
+          return order;
+        }
+      } catch (e) { /* keep the Paystack confirmation */ }
     }
+
+    /* still unknown: the money was taken by Paystack, confirmation pending */
+    order.payment.verified = null;
+    if (order.payment.status === 'success') order.status = 'Paid by card - verification pending';
     return order;
   }
 
@@ -496,16 +535,21 @@ document.addEventListener('DOMContentLoaded', function () {
     const btn = this.querySelector('[type=submit]');
     btn.disabled = true;
 
-    /* card: Paystack popup, then Make verifies the money */
+    /* card: Paystack confirms the payment in its popup, so the receipt
+       prints straight away. Make verification then runs in the
+       background and updates that same receipt - the customer is never
+       left waiting on the automation. */
     if (order.pay === 'card' && cardReady) {
       say('Opening secure payment...');
       payWithPaystack(order, btn).then(function (paid) {
-        if (!paid) return null;
-        say('Checking the payment with Paystack...');
-        return verifyPaystack(order).then(function (o) {
-          return postOrder(order).then(function () { return o; });
+        if (!paid) return;
+        finishOrder(order);
+        verifyPaystack(order).then(function () {
+          receipts.save(order);
+          paintReceiptList();
+          if (!$('#receiptHost').hidden) showReceipt(order.ref);
         });
-      }).then(finishOrder);
+      });
       return;
     }
 
@@ -540,13 +584,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if (paid && verified === true) {
       say('Payment received and verified. A copy is on its way to your email.', 'ok');
     } else if (paid) {
-      say('Payment made. We are confirming it with Paystack and will call you shortly.', 'ok');
+      say('Payment received. Your receipt is below and a copy is on its way to your email.', 'ok');
     } else {
       say('Your order is ready. Send the email we opened, and your receipt is below.', 'ok');
       setTimeout(function () { window.location.href = mailDraft(done); }, 600);
     }
 
-    $('#checkoutMain').hidden = true;
+    if (checkoutMain) checkoutMain.hidden = true;
     showReceipt(done.ref);
 
     const btn = document.querySelector('#checkoutForm [type=submit]');

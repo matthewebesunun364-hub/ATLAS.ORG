@@ -227,20 +227,21 @@ function headerHTML(active) {
     (active === c.id ? ' class="on"' : '') + '>' + esc(c.name) + '</a>').join('');
 
   return '' +
+  '<a class="skip" href="#main">Skip to content</a>' +
   '<div class="topbar"><div class="wrap">' +
     '<span class="deliver">Deliver to <b>' + esc(C.city) + '</b> <span class="mono hide-sm">' +
       esc(C.state) + '</span></span>' +
-    '<nav class="topnav">' +
+    '<nav class="topnav" aria-label="Utility">' +
+      '<a href="contact.html">Contact &amp; location</a>' +
       '<a href="wholesale.html">Wholesale</a>' +
       '<a href="wholesale.html#faq">Help</a>' +
-      '<a href="wholesale.html#contact">Contact</a>' +
       '<a href="' + WA + '" target="_blank" rel="noopener">WhatsApp</a>' +
     '</nav>' +
   '</div></div>' +
 
   '<header class="head"><div class="wrap">' +
-    '<button class="burger" type="button" data-burger aria-label="Menu">&#9776;</button>' +
-    '<a class="logo" href="index.html" aria-label="Ayoola Enterprises home">' +
+    '<button class="burger" type="button" data-burger aria-label="Menu"><span aria-hidden="true">&#9776;</span></button>' +
+    '<a class="logo" href="index.html">' +
       logoMark() + logoWord() +
     '</a>' +
     '<form class="searchbar" action="category.html" method="get" role="search">' +
@@ -249,7 +250,7 @@ function headerHTML(active) {
     '</form>' +
     '<div class="head-act">' +
       '<a class="iconbtn" href="tel:' + C.phone + '">' + esc(C.phone) + '</a>' +
-      '<a class="iconbtn" href="cart.html" aria-label="Cart">Cart' +
+      '<a class="iconbtn" href="cart.html">Cart' +
         '<span class="cnt" data-cart-count></span></a>' +
     '</div>' +
   '</div></header>' +
@@ -304,7 +305,8 @@ function footerHTML() {
       '<li><a href="wholesale.html#delivery">Delivery areas</a></li>' +
     '</ul></div>' +
     '<div><h4>Help</h4><ul>' +
-      '<li><a href="wholesale.html#payments">How to pay</a></li>' +
+      '<a href="wholesale.html#payments">How to pay</a>' +
+      '<li><a href="contact.html">Contact &amp; location</a></li>' +
       '<li><a href="wholesale.html#faq">FAQ</a></li>' +
       '<li><a href="wholesale.html#returns">Returns</a></li>' +
       '<li><a href="' + WA + '" target="_blank" rel="noopener">WhatsApp us</a></li>' +
@@ -322,7 +324,7 @@ function footerHTML() {
 function drawerHTML() {
   return '<div class="scrim" data-scrim></div>' +
     '<aside class="drawer" data-drawer aria-label="Shopping cart">' +
-      '<div class="hd"><span>Your cart</span><button type="button" data-drawer-close aria-label="Close cart">&times;</button></div>' +
+      '<div class="hd"><span>Your cart</span><button type="button" data-drawer-close aria-label="Close cart"><span aria-hidden="true">&times;</span></button></div>' +
       '<div class="bd" data-drawer-body></div>' +
       '<div class="ft" data-drawer-foot></div>' +
     '</aside>';

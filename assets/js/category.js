@@ -33,25 +33,161 @@ document.addEventListener('DOMContentLoaded', function () {
       S.esc(b) + '<span class="cnt">' + n + '</span></label>';
   }).join('');
 
-  /* ---------- heading / breadcrumbs ---------- */
+  /* ---------- heading / breadcrumbs / per-category SEO ---------- */
+  const SEO = {
+    foodstuffs: {
+      title: 'Foodstuff in Akure | Rice, Beans, Semo, Yam | Ayoola Enterprise',
+      desc: 'Buy foodstuff in Akure: parboiled rice, brown beans, semo, yam, garri, egusi, amala and ripe plantain. Wholesale and retail prices with delivery across Akure, Ondo State.',
+      h: 'Foodstuff and groceries in Akure',
+      intro: 'Rice, beans, semo, yam, garri, egusi, amala flour and ripe plantain, sold by the bag or the bowl. Order online for delivery anywhere in Akure.',
+    },
+    frozen: {
+      title: 'Frozen Foods in Akure | Frozen Fish and Prawns | Ayoola Enterprise',
+      desc: 'Frozen food supplier in Akure: whole tilapia, mackerel, croaker, prawns, cuttle fish and shark. Packed cold and delivered across Akure, Ondo State.',
+      h: 'Frozen foods in Akure',
+      intro: 'Whole tilapia, mackerel, croaker, prawns, cuttle fish and shark, kept frozen and delivered in insulated boxes anywhere in Akure.',
+    },
+    poultry: {
+      title: 'Frozen Chicken and Poultry in Akure | Ayoola Enterprise',
+      desc: 'Frozen chicken in Akure: whole chicken cartons, turkey, chicken gizzard and boneless breast. Wholesale and retail supply delivered across Akure, Ondo State.',
+      h: 'Frozen chicken and poultry in Akure',
+      intro: 'Whole chicken in 10kg and 20kg cartons, turkey, gizzard and boneless breast, delivered frozen across Akure.',
+    },
+    drinks: {
+      title: 'Drinks in Akure | Soft Drinks, Malt, Juice and Water | Ayoola Enterprise',
+      desc: 'Buy drinks in Akure: Coca-Cola, malt, fruit juice, table water, energy drinks, Fanta and wine, sold by the bottle, the dozen or the full crate.',
+      h: 'Drinks and beverages in Akure',
+      intro: 'Soft drinks, malt, juice, table water, energy drinks and wine, sold singly, by the twelve or by the full crate for events in Akure.',
+    },
+    oils: {
+      title: 'Palm Oil, Tomato Paste and Seasoning Cubes in Akure | Ayoola Enterprise',
+      desc: 'Buy palm oil, soya oil, tomato paste, seasoning cubes and blended spices in Akure. Retail and 25L keg sizes with delivery across Akure, Ondo State.',
+      h: 'Oils and seasoning in Akure',
+      intro: 'Palm oil by the 5L or 25L keg, soya oil, tomato paste, bouillon cubes and blended herbs and spices for stews and fried rice.',
+    },
+    noodles: {
+      title: 'Noodles and Pasta in Akure | Indomie, Spaghetti | Ayoola Enterprise',
+      desc: 'Buy noodles and pasta in Akure: Indomie cartons, spaghetti, dry noodles and pasta. Wholesale and retail supply with delivery across Akure, Ondo State.',
+      h: 'Noodles and pasta in Akure',
+      intro: 'Indomie by the carton, spaghetti, dry noodles and pasta, for homes, offices and food businesses in Akure.',
+    },
+    snacks: {
+      title: 'Groceries in Akure | Sugar, Biscuits, Milk, Salt and Tins | Ayoola Enterprise',
+      desc: 'Buy groceries in Akure: granulated sugar, biscuits, evaporated and powdered milk, table salt and tinned tomato. Delivered across Akure, Ondo State.',
+      h: 'Groceries and everyday essentials in Akure',
+      intro: 'Sugar, biscuits, evaporated and powdered milk, table salt and tinned tomato for tea, pap, baking and cooking.',
+    },
+    bundles: {
+      title: 'Wholesale Food Bundles in Akure | Shop Starter Packs | Ayoola Enterprise',
+      desc: 'Pre-packed wholesale food bundles in Akure for shops, restaurants and events: shop starter packs, family baskets, drinks crates and frozen fish bundles.',
+      h: 'Wholesale food bundles in Akure',
+      intro: 'Pre-packed baskets for a retail shop, a month of food for a family, mixed drinks crates and frozen fish packs, all at one wholesale rate.',
+    },
+  };
+
   function paintHead() {
     const one = state.cats.length === 1 ? A.cat(state.cats[0]) : null;
-    const title = one ? one.name
-                : state.q ? 'Results for "' + state.q + '"'
-                : 'All products';
+    const seo = one ? SEO[one.id] : null;
+    const title = seo ? seo.title
+                : state.q ? 'Search results for ' + state.q + ' | Ayoola Enterprise'
+                : 'Buy foodstuff, groceries and frozen foods in Akure | Ayoola Enterprise';
+    const desc = seo ? seo.desc
+               : 'Browse foodstuffs, frozen fish, poultry, drinks, oils, snacks and wholesale bundles from Ayoola Enterprise in Akure, Ondo State. Delivery across Akure.';
 
-    document.title = title + ' | Ayoola Enterprises';
+    document.title = title;
+
+    const md = document.querySelector('meta[name=description]');
+    if (md) md.setAttribute('content', desc);
+    const ogT = document.querySelector('meta[property="og:title"]');
+    if (ogT) ogT.setAttribute('content', title);
+    const ogD = document.querySelector('meta[property="og:description"]');
+    if (ogD) ogD.setAttribute('content', desc);
+
+    /* self-canonicalise only a real category page, never a search result */
+    if (seo) {
+      const url = 'https://ayoola-enterprise.pages.dev/category.html?cat=' + one.id;
+      let can = document.querySelector('link[rel=canonical]');
+      if (!can) { can = document.createElement('link'); can.rel = 'canonical'; document.head.appendChild(can); }
+      can.href = url;
+      const ogU = document.querySelector('meta[property="og:url"]');
+      if (ogU) ogU.setAttribute('content', url);
+      injectCategorySchema(one, seo);
+    }
 
     $('[data-crumbs]').innerHTML =
       '<a href="index.html">Home</a><span>&rsaquo;</span>' +
-      (one ? '<a href="category.html">' + one.name + '</a>' : '<span>' + S.esc(title) + '</span>');
+      (one ? '<a href="category.html">' + S.esc(one.name) + '</a>' : '<span>All products</span>');
 
     const h = document.createElement('div');
     h.className = 'sec-h';
-    h.innerHTML = '<h1>' + S.esc(title) + '</h1>' +
-      (one ? '<span class="more">' + S.esc(one.note) + '</span>' : '');
+    h.innerHTML = '<h1>' + S.esc(seo ? seo.h : (state.q ? 'Search results' : 'All products in Akure')) + '</h1>' +
+      '<span class="more">' + S.esc(one ? one.note : 'Foodstuff, groceries, frozen foods and drinks') + '</span>';
     $('.shop').parentNode.insertBefore(h, $('.shop'));
+
+    /* one short, useful paragraph per category page */
+    if (seo) {
+      const box = document.createElement('div');
+      box.className = 'ribbon-strip';
+      box.setAttribute('data-cat-intro', '');
+      box.style.marginBottom = '1rem';
+      box.innerHTML = '<span class="mono">About this category</span><span>' + S.esc(seo.intro) +
+        ' <a href="contact.html" style="color:var(--accent-text)">Call 08060157605</a> or ' +
+        '<a href="wholesale.html#quote" style="color:var(--accent-text)">ask for a bulk price</a>.</span>';
+      const shop = $('.shop');
+      shop.parentNode.insertBefore(box, shop);
+    }
   }
+
+  function injectCategorySchema(cat, seo) {
+    const prev = document.getElementById('cat-schema');
+    if (prev) prev.remove();
+    const items = A.PRODUCTS.filter((p) => p.cat === cat.id);
+    const ld = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'CollectionPage',
+          name: seo.h,
+          url: 'https://ayoola-enterprise.pages.dev/category.html?cat=' + cat.id,
+          inLanguage: 'en-NG',
+          description: seo.desc,
+          about: {
+            '@type': 'Store',
+            name: A.CONFIG.company,
+            address: {
+              '@type': 'PostalAddress',
+              addressLocality: A.CONFIG.city,
+              addressRegion: A.CONFIG.state,
+              addressCountry: 'NG',
+            },
+          },
+        },
+        {
+          '@type': 'ItemList',
+          itemListElement: items.map((p, i) => ({
+            '@type': 'ListItem',
+            position: i + 1,
+            name: p.name,
+            url: 'https://ayoola-enterprise.pages.dev/product.html?id=' + p.id,
+          })),
+        },
+        {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://ayoola-enterprise.pages.dev/' },
+            { '@type': 'ListItem', position: 2, name: 'All products', item: 'https://ayoola-enterprise.pages.dev/category.html' },
+            { '@type': 'ListItem', position: 3, name: cat.name, item: 'https://ayoola-enterprise.pages.dev/category.html?cat=' + cat.id },
+          ],
+        },
+      ],
+    };
+    const tag = document.createElement('script');
+    tag.type = 'application/ld+json';
+    tag.id = 'cat-schema';
+    tag.textContent = JSON.stringify(ld);
+    document.head.appendChild(tag);
+  }
+
 
   /* ---------- filtering ---------- */
   function match(p) {

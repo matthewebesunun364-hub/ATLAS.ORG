@@ -16,7 +16,8 @@ python -m http.server 8765     # then open http://localhost:8765
 ```
 
 Pages: `index.html` (home), `category.html` (list and filters),
-`product.html`, `cart.html`, `checkout.html`, `wholesale.html`, `404.html`.
+`product.html`, `cart.html`, `checkout.html`, `wholesale.html`, `contact.html`,
+`404.html`. See `SEO-REPORT.md` for the local SEO audit and action plan.
 
 ---
 

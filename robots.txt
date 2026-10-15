@@ -1,4 +1,16 @@
+# robots.txt - Ayoola Enterprise, Akure, Ondo State
+# Everything is open for indexing except the checkout steps,
+# which hold no searchable content.
+
 User-agent: *
 Allow: /
+Allow: /assets/
 
-Sitemap: /sitemap.xml
+# No order, cart or receipt page should ever be indexed.
+Disallow: /cart
+Disallow: /cart.html
+Disallow: /checkout
+Disallow: /checkout.html
+Disallow: /404.html
+
+Sitemap: https://ayoola-enterprise.pages.dev/sitemap.xml
