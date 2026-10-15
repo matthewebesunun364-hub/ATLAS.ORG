@@ -427,40 +427,126 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       const amount = Math.round(order.total * 100);   /* naira -> kobo */
+      let settled = false;
 
-      const handler = PaystackPop.setup({
-        key: PK,
-        email: order.email,
-        amount: amount,
-        currency: C.currency || 'NGN',
-        ref: order.ref,
-        metadata: {
-          order_ref: order.ref,
-          customer: order.name,
-          phone: order.phone,
-          delivery_area: order.area,
-        },
-        onSuccess: function (trans) {
-          cardMsg('');
-          order.payment = {
-            id: (trans && trans.reference) || order.ref,
-            status: 'success',
-            transaction: (trans && trans.transcription && trans.transcription.reference) || '',
-            amount: amount,
-            live: !PK.startsWith('pk_test_'),
-          };
-          order.status = 'Paid by card';
-          resolve(true);
-        },
-        onCancel: function () {
-          say('Payment cancelled. Your basket is still here if you want to try again.', 'err');
+      const finish = function (ok) {
+        if (settled) return;
+        settled = true;
+        clearInterval(watch);
+        resolve(ok);
+      };
+
+      /* Watchdog: Paystack draws its payment window as an iframe and hides
+         it until it is ready. If that handshake ever fails the customer
+         would sit on "Opening secure payment" forever, so watch for the
+         window actually becoming visible and offer a way out if it does not. */
+      let ticks = 0;
+      let announced = false;
+      const watch = setInterval(function () {
+        if (settled) return;
+        ticks++;
+
+        if (!announced && paystackVisible()) {
+          announced = true;
+          say('Finish your card details in the Paystack window that just opened.');
+        }
+
+        /* gone or hidden after 6s means the payment window never opened */
+        if (ticks > 12 && !paystackVisible()) {
+          clearInterval(watch);
+          settled = true;
+          say('The Paystack payment window did not open. This is usually your ' +
+              'browser blocking pop-ups. Allow pop-ups for this site and press ' +
+              'Pay with card again, or pay by bank transfer.', 'err');
           btn.disabled = false;
-          resolve(false);
-        },
-      });
+          const retry = document.querySelector('input[name=pay][value=card]');
+          if (retry) retry.focus();
+          return;
+        }
+      }, 500);
 
-      handler.openIframe();
+      try {
+        const handler = PaystackPop.setup({
+          key: PK,
+          email: order.email,
+          amount: amount,
+          currency: C.currency || 'NGN',
+          ref: order.ref,
+          metadata: {
+            order_ref: order.ref,
+            customer: order.name,
+            phone: order.phone,
+            delivery_area: order.area,
+          },
+          onSuccess: function (trans) {
+            cardMsg('');
+            const t = trans || {};
+
+            /* Paystack normally only fires onSuccess for a real charge, but
+               if it ever reports a non-success status we must NOT tell the
+               customer their money was taken. */
+            const st = String(t.status == null ? 'success' : t.status).toLowerCase();
+            const good = !st || /^(success|successful|completed|complete|paid)$/.test(st);
+
+            order.payment = {
+              id: t.reference || t.transaction || t.id || order.ref,
+              status: good ? 'success' : 'failed',
+              paystackStatus: st,
+              amount: (typeof t.amount === 'number' && t.amount) ? t.amount : amount,
+              live: !PK.startsWith('pk_test_'),
+            };
+
+            if (!good) {
+              order.payment.verified = false;
+              order.status = 'Card payment not confirmed by Paystack (' + st + ')';
+              finish(true);           /* still print the receipt, marked unconfirmed */
+              return;
+            }
+
+            order.status = 'Paid by card';
+            finish(true);
+          },
+          onCancel: function () {
+            say('Payment cancelled. Your basket is still here if you want to try again.', 'err');
+            btn.disabled = false;
+            finish(false);
+          },
+          onClose: function () {
+            say('The payment window was closed before the payment completed. ' +
+                'Your basket is still here, or pay by bank transfer.', 'err');
+            btn.disabled = false;
+            finish(false);
+          },
+          onError: function (e) {
+            say('Paystack could not start the payment' +
+                ((e && e.message) ? ' (' + e.message + ')' : '') +
+                '. Please try again, or pay by bank transfer.', 'err');
+            btn.disabled = false;
+            finish(false);
+          },
+        });
+
+        handler.openIframe();
+      } catch (e) {
+        clearInterval(watch);
+        settled = true;
+        say('We could not start the card payment (' + (e.message || 'error') +
+            '). Please try again, or pay by bank transfer.', 'err');
+        btn.disabled = false;
+        resolve(false);
+      }
     });
+  }
+
+  /* true once Paystack's payment window is on screen and usable */
+  function paystackVisible() {
+    const frames = document.querySelectorAll('iframe');
+    for (let i = 0; i < frames.length; i++) {
+      const f = frames[i];
+      if (!/paystack|checkout/i.test(f.src || '')) continue;
+      if (getComputedStyle(f).visibility !== 'hidden') return true;
+    }
+    return false;
   }
 
   /* ---------- verification ----------
@@ -473,6 +559,13 @@ document.addEventListener('DOMContentLoaded', function () {
      is marked "verification pending" - never reported as a failure. */
   async function verifyPaystack(order) {
     order.payment = order.payment || {};
+
+    /* Paystack itself already reported a non-successful payment - never
+       let a silent automation overwrite that with "received". */
+    if (order.payment.status && order.payment.status !== 'success') {
+      order.payment.verified = false;
+      return order;
+    }
 
     if (C.makeWebhook) {
       const res = await Make.sendPayment(order);
